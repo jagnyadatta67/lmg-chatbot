@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+    body {
+      font-family: "Inter", sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f8fafc;
+      color: #222;
+    }
+    header {
+      background: linear-gradient(135deg, #303ab2, #4a55e2);
+      color: #fff;
+      padding: 16px 24px;
+      font-size: 22px;
+      font-weight: 600;
+    }
+    .container {
+      padding: 20px 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      padding: 20px;
+    }
+    .card h3 {
+      margin-top: 0;
+      font-size: 18px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 8px;
+      color: #303ab2;
+    }
+    canvas {
+      width: 100% !important;
+      height: 300px !important;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .metric {
+      text-align: center;
+      padding: 12px;
+      background: #f3f4f6;
+      border-radius: 8px;
+      font-size: 15px;
+    }
+    .metric strong {
+      display: block;
+      font-size: 20px;
+      color: #303ab2;
+    }
+  </style>
+</head>
+<body>
+<header>🧠 AI Analytics Dashboard</header>
+<div class="container">
+    <div class="card">
+        <h3>📅 Usage Summary (Today)</h3>
+        <div id="todaySummary" class="summary-grid"></div>
+    </div>
+
+    <div class="card">
+        <h3>🧩 Model Usage (Last 7 Days)</h3>
+        <canvas id="modelUsageChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h3>📈 Token Usage Over Time (Last 7 Days)</h3>
+        <canvas id="tokenTrendChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h3>💰 Cost Breakdown (This Week)</h3>
+        <canvas id="costChart"></canvas>
+    </div>
+</div>
+
+<script>
+    const API_BASE = "/api/analytics";
+
+    // === Utility: Fetch JSON safely ===
+    async function fetchJson(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch " + url);
+      return res.json();
+    }
+
+    // === Load Today Summary ===
+    async function loadTodaySummary() {
+      try {
+        const data = await fetchJson(`${API_BASE}/summary/today`);
+        const container = document.getElementById("todaySummary");
+        container.innerHTML = `
+          <div class="metric"><strong>${data.totalRequests || 0}</strong>Total Requests</div>
+          <div class="metric"><strong>${data.totalTokens || 0}</strong>Total Tokens</div>
+          <div class="metric"><strong>₹${(data.totalCost || 0).toFixed(2)}</strong>Total Cost</div>
+        `;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // === Model Usage Chart ===
+    async function loadModelUsage() {
+      try {
+        const models = await fetchJson(`${API_BASE}/models/week`);
+        const ctx = document.getElementById("modelUsageChart").getContext("2d");
+        new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: models.map(m => m.model),
+            datasets: [{
+              label: "Usage Count",
+              data: models.map(m => m.count),
+              backgroundColor: "#4a55e2"
+            }]
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+          }
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // === Token Trend Chart (Fake data - can adapt backend) ===
+    async function loadTokenTrend() {
+      try {
+        const weekly = await fetchJson(`${API_BASE}/summary/week`);
+        const ctx = document.getElementById("tokenTrendChart").getContext("2d");
+        new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+            datasets: [{
+              label: "Tokens Used",
+              data: weekly.dailyTokens || [200, 150, 300, 250, 400, 350, 280],
+              borderColor: "#303ab2",
+              fill: false,
+              tension: 0.3
+            }]
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+          }
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // === Cost Chart ===
+    async function loadCostChart() {
+      try {
+        const weekly = await fetchJson(`${API_BASE}/summary/week`);
+        const ctx = document.getElementById("costChart").getContext("2d");
+        new Chart(ctx, {
+          type: "doughnut",
+          data: {
+            labels: ["Prompt Cost", "Completion Cost"],
+            datasets: [{
+              data: [weekly.promptCost || 0, weekly.completionCost || 0],
+              backgroundColor: ["#f89f17", "#4a55e2"]
+            }]
+          },
+          options: {
+            plugins: {
+              legend: { position: "bottom" }
+            }
+          }
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // === Init ===
+    loadTodaySummary();
+    loadModelUsage();
+    loadTokenTrend();
+    loadCostChart();
+  </script>
+</body>
+</html>

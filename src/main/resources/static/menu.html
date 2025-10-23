@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu Management System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .actions-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+            transform: translateY(-2px);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 14px;
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .menu-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+
+        .menu-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .menu-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .menu-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.7em;
+            font-weight: 600;
+        }
+
+        .badge-active {
+            background: #10b981;
+        }
+
+        .badge-inactive {
+            background: #ef4444;
+        }
+
+        .menu-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .submenu-list {
+            padding: 20px;
+        }
+
+        .submenu-item {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .submenu-item:hover {
+            background: #f3f4f6;
+            transform: translateX(5px);
+        }
+
+        .submenu-info {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .submenu-name {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 1.1em;
+        }
+
+        .submenu-meta {
+            display: flex;
+            gap: 10px;
+            font-size: 0.85em;
+            color: #6b7280;
+        }
+
+        .type-badge {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .type-dynamic {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .type-static {
+            background: #fce7f3;
+            color: #9f1239;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #9ca3af;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            color: #667eea;
+            font-size: 1.8em;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 2em;
+            cursor: pointer;
+            color: #9ca3af;
+            line-height: 1;
+        }
+
+        .close-btn:hover {
+            color: #ef4444;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group input[type="checkbox"] {
+            width: auto;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 1.2em;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .menu-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .actions-bar {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🍔 Menu Management System</h1>
+        <p>Manage your menus and submenus with ease</p>
+    </div>
+
+    <div id="alertContainer"></div>
+
+    <div class="actions-bar">
+        <button class="btn btn-primary" onclick="openAddMenuModal()">
+            ➕ Add New Menu
+        </button>
+        <button class="btn btn-success" onclick="openAddSubMenuModal()">
+            ➕ Add SubMenu
+        </button>
+        <button class="btn btn-warning" onclick="loadMenus()">
+            🔄 Refresh
+        </button>
+    </div>
+
+    <div id="loadingIndicator" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <div>Loading menus...</div>
+    </div>
+
+    <div id="menuContainer" class="menu-grid"></div>
+</div>
+
+<!-- Add Menu Modal -->
+<div id="addMenuModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Add New Menu</h2>
+            <button class="close-btn" onclick="closeModal('addMenuModal')">&times;</button>
+        </div>
+        <form id="addMenuForm">
+            <div class="form-group">
+                <label>Title *</label>
+                <input type="text" id="menuTitle" required>
+            </div>
+            <div class="form-group">
+                <label>Display Order *</label>
+                <input type="number" id="menuDisplayOrder" required>
+            </div>
+            <div class="form-group">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="menuActive" checked>
+                    <label for="menuActive">Active</label>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Save Menu</button>
+        </form>
+    </div>
+</div>
+
+<!-- Add SubMenu Modal -->
+<div id="addSubMenuModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Add New SubMenu</h2>
+            <button class="close-btn" onclick="closeModal('addSubMenuModal')">&times;</button>
+        </div>
+        <form id="addSubMenuForm">
+            <div class="form-group">
+                <label>Select Menu *</label>
+                <select id="subMenuParent" required></select>
+            </div>
+            <div class="form-group">
+                <label>Title *</label>
+                <input type="text" id="subMenuTitle" required>
+            </div>
+            <div class="form-group">
+                <label>Type *</label>
+                <select id="subMenuType" required>
+                    <option value="static">Static</option>
+                    <option value="dynamic">Dynamic</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Display Order *</label>
+                <input type="number" id="subMenuDisplayOrder" required>
+            </div>
+            <div class="form-group">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="subMenuActive" checked>
+                    <label for="subMenuActive">Active</label>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-success" style="width: 100%;">Save SubMenu</button>
+        </form>
+    </div>
+</div>
+
+<script>
+        const API_BASE_URL = 'http://localhost:8080/api/menu';
+
+        // Load menus on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadMenus();
+        });
+
+        // Load all menus
+        async function loadMenus() {
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const menuContainer = document.getElementById('menuContainer');
+
+            loadingIndicator.style.display = 'block';
+            menuContainer.innerHTML = '';
+
+            try {
+                const response = await fetch(API_BASE_URL);
+                const menus = await response.json();
+
+                loadingIndicator.style.display = 'none';
+
+                if (menus.length === 0) {
+                    menuContainer.innerHTML = `
+                        <div class="empty-state" style="grid-column: 1/-1;">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                            </svg>
+                            <h3>No Menus Found</h3>
+                            <p>Click "Add New Menu" to get started</p>
+                        </div>
+                    `;
+                } else {
+                    menus.forEach(menu => displayMenu(menu));
+                }
+            } catch (error) {
+                loadingIndicator.style.display = 'none';
+                showAlert('Error loading menus: ' + error.message, 'error');
+            }
+        }
+
+        // Display a single menu card
+        function displayMenu(menu) {
+            const menuContainer = document.getElementById('menuContainer');
+            const menuCard = document.createElement('div');
+            menuCard.className = 'menu-card';
+
+            const subMenusHtml = menu.subMenus && menu.subMenus.length > 0
+                ? menu.subMenus.map(sub => `
+                    <div class="submenu-item">
+                        <div class="submenu-info">
+                            <div class="submenu-name">${sub.title}</div>
+                            <div class="submenu-meta">
+                                <span class="type-badge ${sub.type === 'dynamic' ? 'type-dynamic' : 'type-static'}">
+                                    ${sub.type}
+                                </span>
+                                <span>Order: ${sub.displayOrder}</span>
+                                <span class="badge badge-${sub.active ? 'active' : 'inactive'}" style="font-size: 0.75em;">
+                                    ${sub.active ? 'Active' : 'Inactive'}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="menu-actions">
+                            <button class="btn btn-warning btn-sm" onclick="toggleSubMenuStatus(${sub.id})">
+                                ${sub.active ? '❌' : '✅'}
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteSubMenu(${sub.id})">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `).join('')
+                : '<div class="empty-state"><p>No submenus available</p></div>';
+
+            menuCard.innerHTML = `
+                <div class="menu-header">
+                    <div class="menu-title">
+                        ${menu.title}
+                        <span class="badge badge-${menu.active ? 'active' : 'inactive'}">
+                            ${menu.active ? 'Active' : 'Inactive'}
+                        </span>
+                    </div>
+                    <div class="menu-actions">
+                        <button class="btn btn-warning btn-sm" onclick="toggleMenuStatus(${menu.id})" title="Toggle Status">
+                            ${menu.active ? '❌' : '✅'}
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteMenu(${menu.id})" title="Delete">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+                <div class="submenu-list">
+                    ${subMenusHtml}
+                </div>
+            `;
+
+            menuContainer.appendChild(menuCard);
+        }
+
+        // Add Menu Form Submit
+        document.getElementById('addMenuForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const menuData = {
+                title: document.getElementById('menuTitle').value,
+                displayOrder: parseInt(document.getElementById('menuDisplayOrder').value),
+                active: document.getElementById('menuActive').checked
+            };
+
+            try {
+                const response = await fetch(API_BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(menuData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    closeModal('addMenuModal');
+                    document.getElementById('addMenuForm').reset();
+                    loadMenus();
+                } else {
+                    showAlert(result.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Error adding menu: ' + error.message, 'error');
+            }
+        });
+
+        // Add SubMenu Form Submit
+        document.getElementById('addSubMenuForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const menuId = document.getElementById('subMenuParent').value;
+            const subMenuData = {
+                title: document.getElementById('subMenuTitle').value,
+                type: document.getElementById('subMenuType').value,
+                displayOrder: parseInt(document.getElementById('subMenuDisplayOrder').value),
+                active: document.getElementById('subMenuActive').checked
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/${menuId}/submenu`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(subMenuData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    closeModal('addSubMenuModal');
+                    document.getElementById('addSubMenuForm').reset();
+                    loadMenus();
+                } else {
+                    showAlert(result.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Error adding submenu: ' + error.message, 'error');
+            }
+        });
+
+        // Toggle Menu Status
+        async function toggleMenuStatus(menuId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/${menuId}/toggle`, {
+                    method: 'PATCH'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    loadMenus();
+                } else {
+                    showAlert(result.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Error toggling menu status: ' + error.message, 'error');
+            }
+        }
+
+        // Delete Menu
+        async function deleteMenu(menuId) {
+            if (!confirm('Are you sure you want to delete this menu? This will also delete all submenus.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/${menuId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    loadMenus();
+                } else {
+                    showAlert(result.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Error deleting menu: ' + error.message, 'error');
+            }
+        }
+
+        // Toggle SubMenu Status
+        async function toggleSubMenuStatus(subMenuId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/submenu/${subMenuId}/toggle`, {
+                    method: 'PATCH'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    loadMenus();
+                } else {
+                    showAlert(result.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Error toggling submenu status: ' + error.message, 'error');
+            }
+        }
+
+        // Delete SubMenu
+        async function deleteSubMenu(subMenuId) {
+            if (!confirm('Are you sure you want to delete this submenu?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/submenu/${subMenuId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    loadMenus();
+                } else {
+                    showAlert(result.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Error deleting submenu: ' + error.message, 'error');
+            }
+        }
+
+        // Open Add Menu Modal
+        function openAddMenuModal() {
+            document.getElementById('addMenuModal').classList.add('active');
+        }
+
+        // Open Add SubMenu Modal
+        async function openAddSubMenuModal() {
+            try {
+                const response = await fetch(API_BASE_URL);
+                const menus = await response.json();
+
+                const selectElement = document.getElementById('subMenuParent');
+                selectElement.innerHTML = '<option value="">-- Select Menu --</option>';
+
+                menus.forEach(menu => {
+                    const option = document.createElement('option');
+                    option.value = menu.id;
+                    option.textContent = menu.title;
+                    selectElement.appendChild(option);
+                });
+
+                document.getElementById('addSubMenuModal').classList.add('active');
+            } catch (error) {
+                showAlert('Error loading menus: ' + error.message, 'error');
+            }
+        }
+
+        // Close Modal
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // Show Alert
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} show`;
+            alertDiv.textContent = message;
+
+            alertContainer.innerHTML = '';
+            alertContainer.appendChild(alertDiv);
+
+            setTimeout(() => {
+                alertDiv.classList.remove('show');
+                setTimeout(() => alertDiv.remove(), 300);
+            }, 3000);
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('active');
+            }
+        }
+    </script>
+</body>
+</html>

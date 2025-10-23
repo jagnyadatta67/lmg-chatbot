@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+    body {
+      font-family: "Inter", sans-serif;
+      background: #f8fafc;
+      margin: 0;
+      padding: 0;
+      color: #111;
+    }
+    header {
+      background: linear-gradient(135deg, #303ab2, #4a55e2);
+      color: white;
+      padding: 16px 24px;
+      font-size: 22px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    select {
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+    }
+    .container {
+      padding: 24px 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+    }
+    .card h3 {
+      margin-top: 0;
+      font-size: 18px;
+      color: #303ab2;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 6px;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+      margin-top: 10px;
+    }
+    .metric {
+      text-align: center;
+      background: #f3f4f6;
+      border-radius: 10px;
+      padding: 14px;
+      transition: 0.3s;
+    }
+    .metric:hover {
+      background: #eef2ff;
+    }
+    .metric strong {
+      display: block;
+      font-size: 22px;
+      color: #303ab2;
+    }
+    canvas {
+      width: 100% !important;
+      height: 320px !important;
+    }
+  </style>
+</head>
+<body>
+<header>
+    <span>🧠 AI Analytics Dashboard</span>
+    <div>
+        <select id="summaryFilter">
+            <option value="today" selected>Today</option>
+            <option value="week">Last 7 Days</option>
+            <option value="month">Last 30 Days</option>
+            <option value="custom">Custom Range</option>
+        </select>
+    </div>
+</header>
+
+<div class="container">
+    <div class="card">
+        <h3>📊 Usage Summary</h3>
+        <div id="summaryData" class="summary-grid"></div>
+    </div>
+
+    <div class="card">
+        <h3>🧩 Model Usage</h3>
+        <canvas id="modelUsageChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h3>📈 Token Usage Trend</h3>
+        <canvas id="tokenTrendChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h3>💰 Cost Distribution</h3>
+        <canvas id="costChart"></canvas>
+    </div>
+</div>
+
+<script>
+    const API_BASE = "/api/analytics";
+
+    // === Fetch JSON safely ===
+    async function fetchJson(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch " + url);
+      return res.json();
+    }
+
+    // === Render Usage Summary ===
+    async function loadSummary(range = "today") {
+      const summaryMap = {
+        today: `${API_BASE}/summary/today`,
+        week: `${API_BASE}/summary/week`,
+        month: `${API_BASE}/summary/month`,
+      };
+
+      let data;
+      if (range === "custom") {
+        const start = prompt("Enter start date (YYYY-MM-DD):");
+        const end = prompt("Enter end date (YYYY-MM-DD):");
+        data = await fetchJson(`${API_BASE}/summary/custom?startDate=${start}&endDate=${end}`);
+      } else {
+        data = await fetchJson(summaryMap[range]);
+      }
+
+      const div = document.getElementById("summaryData");
+      const avgCost = data.totalRequests > 0 ? data.totalCost / data.totalRequests : 0;
+      const avgTokens = data.totalRequests > 0 ? data.totalTokens / data.totalRequests : 0;
+
+      div.innerHTML = `
+        <div class="metric"><strong>${data.totalRequests || 0}</strong>Total Requests</div>
+        <div class="metric"><strong>${data.totalTokens || 0}</strong>Total Tokens</div>
+        <div class="metric"><strong>₹${(data.totalCost || 0).toFixed(2)}</strong>Total Cost</div>
+        <div class="metric"><strong>${avgTokens.toFixed(0)}</strong>Avg Tokens / Request</div>
+        <div class="metric"><strong>₹${avgCost.toFixed(4)}</strong>Avg Cost / Request</div>
+      `;
+    }
+
+    // === Render Model Usage ===
+    async function loadModelUsage() {
+      const data = await fetchJson(`${API_BASE}/models/week`);
+      const ctx = document.getElementById("modelUsageChart").getContext("2d");
+
+      new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: data.map(d => d.model),
+          datasets: [{
+            label: "Usage Count",
+            data: data.map(d => d.count),
+            backgroundColor: "#4a55e2"
+          }]
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    // === Token Usage Trend ===
+    async function loadTokenTrend() {
+      const data = await fetchJson(`${API_BASE}/summary/week`);
+      const ctx = document.getElementById("tokenTrendChart").getContext("2d");
+
+      // Example fallback (in case backend doesn’t return daily trend)
+      const fakeTrend = [15000, 17000, 16500, 18000, 21000, 19500, 17100];
+
+      new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+          datasets: [{
+            label: "Tokens Used",
+            data: data.dailyTokens || fakeTrend,
+            borderColor: "#303ab2",
+            backgroundColor: "#303ab230",
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    // === Cost Chart ===
+    async function loadCostChart() {
+      const data = await fetchJson(`${API_BASE}/summary/week`);
+      const ctx = document.getElementById("costChart").getContext("2d");
+
+      new Chart(ctx, {
+        type: "doughnut",
+        data: {
+          labels: ["Prompt Cost", "Completion Cost"],
+          datasets: [{
+            data: [data.promptCost || 0, data.completionCost || 0],
+            backgroundColor: ["#f89f17", "#4a55e2"]
+          }]
+        },
+        options: {
+          plugins: {
+            legend: { position: "bottom" }
+          }
+        }
+      });
+    }
+
+    // === Dropdown Event ===
+    document.getElementById("summaryFilter").addEventListener("change", (e) => {
+      loadSummary(e.target.value);
+    });
+
+    // === Init ===
+    loadSummary("today");
+    loadModelUsage();
+    loadTokenTrend();
+    loadCostChart();
+  </script>
+</body>
+</html>

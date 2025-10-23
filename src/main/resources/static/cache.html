@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Cache Management</title>
+    <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --accent:#06b6d4; --muted:#9aa4b2; --text:#e6eef5;
+      --danger:#ef4444; --success:#10b981;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    body{
+      margin:0;
+      background:linear-gradient(180deg,#071021 0%, #071829 100%);
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      padding:16px;
+    }
+    .container{
+      max-width:1100px;
+      margin:0 auto;
+      display:grid;
+      grid-template-columns: 1fr 420px;
+      gap:16px;
+    }
+    @media (max-width:900px){
+      .container{ grid-template-columns: 1fr; }
+    }
+    header{
+      margin-bottom:8px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    h1{ margin:0; font-size:1.2rem; letter-spacing:0.2px }
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:10px;
+      padding:12px;
+      box-shadow: 0 6px 20px rgba(2,6,23,0.6);
+      border:1px solid rgba(255,255,255,0.03);
+    }
+    .controls{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+    button{
+      background:transparent;
+      border:1px solid rgba(255,255,255,0.06);
+      color:var(--text);
+      padding:8px 10px;
+      border-radius:8px;
+      cursor:pointer;
+      font-weight:600;
+    }
+    button.primary{
+      background:linear-gradient(90deg,var(--accent), #38bdf8);
+      color:#022026;
+      border:none;
+    }
+    button.ghost{
+      background:transparent;
+    }
+    .small{ font-size:0.85rem; padding:6px 8px; }
+    .muted{ color:var(--muted); font-size:0.9rem; }
+    .form-row{ display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+    input[type="text"], textarea{
+      background:rgba(255,255,255,0.02);
+      border:1px solid rgba(255,255,255,0.04);
+      color:var(--text);
+      padding:8px;
+      border-radius:8px;
+      width:100%;
+      font-size:0.95rem;
+    }
+    label{ font-size:0.85rem; color:var(--muted); display:block; margin-bottom:4px; }
+    .list{ display:flex; flex-direction:column; gap:8px; max-height:320px; overflow:auto; padding-right:6px; }
+    .cache-item{
+      display:flex; justify-content:space-between; align-items:center; gap:8px;
+      padding:8px; border-radius:8px;
+      background:rgba(255,255,255,0.01);
+      border:1px solid rgba(255,255,255,0.02);
+    }
+    pre{
+      background:rgba(0,0,0,0.35);
+      padding:10px;
+      border-radius:8px;
+      overflow:auto;
+      max-height:320px;
+      font-size:0.85rem;
+      color:#dff7fb;
+    }
+    .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .meta { font-size:0.85rem; color:var(--muted); }
+    .pill { padding:4px 8px; border-radius:999px; font-size:0.8rem; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); }
+    .danger{ background:linear-gradient(90deg,var(--danger),#fb7185); color:white; border:none;}
+    .success{ background:linear-gradient(90deg,var(--success),#4ade80); color:#022; border:none;}
+    .flex-col{ display:flex; flex-direction:column; }
+    .spaced{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .footer-note{ font-size:0.8rem; color:var(--muted); margin-top:8px; }
+    .spinner{ width:16px; height:16px; border-radius:50%; border:2px solid rgba(255,255,255,0.12); border-top-color:var(--accent); animation:spin 1s linear infinite; display:inline-block; vertical-align:middle;}
+    @keyframes spin{ to{ transform:rotate(360deg) } }
+  </style>
+</head>
+<body>
+<header class="spaced">
+    <div>
+        <h1>Cache Admin • Chatbot</h1>
+        <div class="muted">Manage caches, view stats, get/evict keys and warm-up common queries</div>
+    </div>
+    <div class="row">
+        <button id="btnRefresh" class="small">Refresh</button>
+        <button id="btnClearAll" class="small danger">Clear All</button>
+    </div>
+</header>
+
+<div class="container">
+    <!-- Left column: controls + results -->
+    <div class="flex-col">
+        <div class="card">
+            <div class="controls">
+                <button id="btnStats" class="primary small">Get Stats</button>
+                <button id="btnInfo" class="small">Get Info</button>
+                <button id="btnClearSelected" class="small">Clear Selected Cache</button>
+                <button id="btnWarmup" class="small">Warmup Cache</button>
+            </div>
+
+            <div style="margin-bottom:8px;">
+                <label for="cacheSelect">Select cache</label>
+                <select id="cacheSelect" style="width:100%; padding:8px; border-radius:8px;">
+                    <option value="">-- choose cache (load Info) --</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom:8px;">
+                <label for="keyInput">Key (for get/evict)</label>
+                <div class="row">
+                    <input id="keyInput" placeholder="cache key (use generated key if using custom key generator)" />
+                    <button id="btnGetKey" class="small">Get</button>
+                    <button id="btnEvictKey" class="small danger">Evict</button>
+                </div>
+            </div>
+
+            <div style="margin-bottom:8px;">
+                <label for="warmupInput">Warmup queries (comma separated)</label>
+                <div class="row">
+                    <input id="warmupInput" placeholder="e.g. hello,how are you,order status" />
+                    <button id="btnDoWarmup" class="small success">Start Warmup</button>
+                </div>
+            </div>
+
+            <div id="messageArea" class="muted footer-note"></div>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div><strong>Cache Info / Stats</strong></div>
+                <div id="statsMeta" class="meta"></div>
+            </div>
+            <div style="margin-top:8px;" id="statsContainer">
+                <pre id="statsPre">Press <code>Get Stats</code> or <code>Get Info</code></pre>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+            <strong>Entry / Evict Result</strong>
+            <div id="entryResult" style="margin-top:8px;">
+                <pre id="entryPre">No entry requested yet.</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right column: cache list + sizes + actions -->
+    <aside class="flex-col">
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div><strong>Caches</strong></div>
+                <div class="meta"><span id="cacheCount">0</span> caches</div>
+            </div>
+
+            <div class="list" id="cacheList" style="margin-top:10px;">
+                <!-- dynamic -->
+            </div>
+
+            <div style="margin-top:10px" class="footer-note">
+                Use <strong>Refresh</strong> to reload info. Evict uses the raw cache key you pass.
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+            <strong>Raw Responses</strong>
+            <div style="margin-top:8px;">
+                <pre id="rawPre">-- raw HTTP responses will appear here for debugging --</pre>
+            </div>
+        </div>
+    </aside>
+</div>
+
+<script>
+    // Base path for the REST controller
+    const API_BASE = '/api/cache';
+
+    // Elements
+    const btnRefresh = document.getElementById('btnRefresh');
+    const btnClearAll = document.getElementById('btnClearAll');
+    const btnStats = document.getElementById('btnStats');
+    const btnInfo = document.getElementById('btnInfo');
+    const btnClearSelected = document.getElementById('btnClearSelected');
+    const btnWarmup = document.getElementById('btnWarmup');
+    const cacheSelect = document.getElementById('cacheSelect');
+    const cacheList = document.getElementById('cacheList');
+    const cacheCount = document.getElementById('cacheCount');
+    const statsPre = document.getElementById('statsPre');
+    const statsMeta = document.getElementById('statsMeta');
+    const rawPre = document.getElementById('rawPre');
+    const btnGetKey = document.getElementById('btnGetKey');
+    const btnEvictKey = document.getElementById('btnEvictKey');
+    const keyInput = document.getElementById('keyInput');
+    const entryPre = document.getElementById('entryPre');
+    const btnDoWarmup = document.getElementById('btnDoWarmup');
+    const warmupInput = document.getElementById('warmupInput');
+    const messageArea = document.getElementById('messageArea');
+
+    // helper to show raw debug output
+    function showRaw(title, obj) {
+      rawPre.textContent = title + '\\n' + JSON.stringify(obj, null, 2);
+    }
+
+    // helper: fetch and handle JSON with error handling
+    async function safeFetch(url, opts = {}) {
+      const start = performance.now();
+      try {
+        const r = await fetch(url, opts);
+        const ms = Math.round(performance.now() - start);
+        const contentType = r.headers.get('content-type') || '';
+        const isJson = contentType.includes('application/json');
+        const payload = isJson ? await r.json() : await r.text();
+        showRaw(`${opts.method || 'GET'} ${url} [${r.status}] in ${ms}ms`, payload);
+        if (!r.ok) {
+          throw { status: r.status, body: payload };
+        }
+        return payload;
+      } catch (err) {
+        showMessage('Error: ' + (err?.status || err?.message || err), true);
+        showRaw('ERROR ' + url, err);
+        throw err;
+      }
+    }
+
+    function showMessage(text, isError = false) {
+      messageArea.textContent = text;
+      messageArea.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+      setTimeout(() => {
+        // auto-clear after 6s
+        if (messageArea.textContent === text) messageArea.textContent = '';
+      }, 6000);
+    }
+
+    // Load info (cache names and sizes)
+    async function loadInfo() {
+      try {
+        const info = await safeFetch(API_BASE + '/info');
+        renderCacheInfo(info);
+        statsMeta.textContent = 'Info loaded at ' + new Date().toLocaleTimeString();
+      } catch (e) { /* handled in safeFetch */ }
+    }
+
+    function renderCacheInfo(info) {
+      // fill select
+      cacheSelect.innerHTML = '<option value="">-- choose cache (select) --</option>';
+      const names = Array.from(info.cacheNames || []);
+      cacheCount.textContent = names.length;
+      cacheList.innerHTML = '';
+      if (names.length === 0) {
+        cacheList.innerHTML = '<div class="muted">No caches available</div>';
+      } else {
+        const sizes = info.cacheSizes || {};
+        names.forEach(name => {
+          // option
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          cacheSelect.appendChild(opt);
+
+          // list item
+          const div = document.createElement('div');
+          div.className = 'cache-item';
+          div.innerHTML = `
+            <div style="min-width:0; flex:1;">
+              <div style="display:flex; align-items:center; gap:8px; justify-content:space-between;">
+                <div style="min-width:0">
+                  <div style="font-weight:700; font-size:0.95rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</div>
+                  <div class="meta">estimatedSize: <span class="pill">${sizes[name] ?? 0}</span></div>
+                </div>
+                <div style="margin-left:12px; display:flex; gap:8px;">
+                  <button class="small" data-action="clear" data-cache="${name}">Clear</button>
+                  <button class="small" data-action="stats" data-cache="${name}">Stats</button>
+                </div>
+              </div>
+            </div>
+          `;
+          cacheList.appendChild(div);
+        });
+      }
+    }
+
+    // Get stats for all caches
+    async function getStats() {
+      try {
+        const stats = await safeFetch(API_BASE + '/stats');
+        statsPre.textContent = JSON.stringify(stats, null, 2);
+        statsMeta.textContent = 'Stats loaded at ' + new Date().toLocaleTimeString();
+      } catch (e) { /* handled */ }
+    }
+
+    // Clear all caches
+    async function clearAllCaches() {
+      if (!confirm('Clear ALL caches? This cannot be undone.')) return;
+      try {
+        const resp = await safeFetch(API_BASE + '/clear', { method: 'DELETE' });
+        showMessage(resp.message || 'All caches cleared');
+        // refresh info
+        setTimeout(loadInfo, 400);
+      } catch (e) {}
+    }
+
+    // Clear specific cache
+    async function clearCache(cacheName) {
+      if (!cacheName) {
+        showMessage('Please select a cache to clear', true);
+        return;
+      }
+      if (!confirm('Clear cache: ' + cacheName + '?')) return;
+      try {
+        const resp = await safeFetch(API_BASE + '/clear/' + encodeURIComponent(cacheName), { method: 'DELETE' });
+        showMessage(resp.message || 'Cache cleared: ' + cacheName);
+        setTimeout(loadInfo, 400);
+      } catch (e) {}
+    }
+
+    // Get cache entry by key
+    async function getCacheEntry(cacheName, key) {
+      if (!cacheName || !key) {
+        showMessage('Please select cache and provide key', true);
+        return;
+      }
+      try {
+        const entry = await safeFetch(`${API_BASE}/${encodeURIComponent(cacheName)}/${encodeURIComponent(key)}`);
+        entryPre.textContent = JSON.stringify(entry, null, 2);
+      } catch (e) {
+        entryPre.textContent = 'Not found or error';
+      }
+    }
+
+    // Evict cache entry by key
+    async function evictCacheKey(cacheName, key) {
+      if (!cacheName || !key) {
+        showMessage('Please select cache and provide key', true);
+        return;
+      }
+      if (!confirm(`Evict key "${key}" from cache "${cacheName}"?`)) return;
+      try {
+        const resp = await safeFetch(`${API_BASE}/${encodeURIComponent(cacheName)}/${encodeURIComponent(key)}`, { method: 'DELETE' });
+        showMessage(resp.message || 'Evicted key');
+        entryPre.textContent = 'Evicted: ' + key;
+        setTimeout(loadInfo, 400);
+      } catch (e) {}
+    }
+
+    // Warmup cache: sends list of queries
+    async function warmupCache(queries) {
+      if (!Array.isArray(queries) || queries.length === 0) {
+        showMessage('Provide at least one warmup query', true);
+        return;
+      }
+      try {
+        // server expects JSON list in body
+        const resp = await safeFetch(API_BASE + '/warmup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(queries)
+        });
+        showMessage(resp.message || 'Warmup started: ' + resp.queryCount);
+      } catch (e) {}
+    }
+
+    // Attach UI events
+    btnRefresh.addEventListener('click', () => { loadInfo(); getStats(); });
+    btnInfo.addEventListener('click', loadInfo);
+    btnStats.addEventListener('click', getStats);
+    btnClearAll.addEventListener('click', clearAllCaches);
+    btnClearSelected.addEventListener('click', () => clearCache(cacheSelect.value));
+    btnGetKey.addEventListener('click', () => getCacheEntry(cacheSelect.value || cacheSelect.options[cacheSelect.selectedIndex]?.value, keyInput.value.trim()));
+    btnEvictKey.addEventListener('click', () => evictCacheKey(cacheSelect.value, keyInput.value.trim()));
+    btnDoWarmup.addEventListener('click', () => {
+      const raw = warmupInput.value.trim();
+      const arr = raw ? raw.split(',').map(s => s.trim()).filter(Boolean) : [];
+      warmupCache(arr);
+    });
+
+    // Delegate click events for dynamic cache list buttons
+    cacheList.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('button');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const cache = btn.dataset.cache;
+      if (action === 'clear') {
+        clearCache(cache);
+      } else if (action === 'stats') {
+        // call stats endpoint and filter for that cache
+        getStats().then(() => {
+          // optionally highlight relevant cache in statsPre
+          const text = statsPre.textContent;
+          try {
+            const json = JSON.parse(text);
+            if (json[cache]) {
+              entryPre.textContent = JSON.stringify(json[cache], null, 2);
+            } else {
+              entryPre.textContent = 'No stats for cache: ' + cache;
+            }
+          } catch (e) {
+            entryPre.textContent = 'No stats available';
+          }
+        });
+      }
+    });
+
+    // initial load
+    (function init(){
+      // try loading info and stats on first run
+      loadInfo().catch(()=>{});
+      // small delay to avoid pounding server on page load
+      setTimeout(()=>getStats().catch(()=>{}), 300);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Multi-Tenant PDF Manager</title>
+    <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background-color: #f5f7fa;
+      margin: 0;
+      padding: 2rem;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 2rem;
+    }
+
+    .upload-section {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 2rem;
+      max-width: 600px;
+      margin-inline: auto;
+    }
+
+    .upload-section label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .upload-section input, select {
+      width: 100%;
+      padding: 0.6rem;
+      margin-bottom: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    .upload-section button {
+      background-color: #0078d4;
+      color: white;
+      padding: 0.7rem 1.2rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .upload-section button:hover {
+      background-color: #005fa3;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    th, td {
+      padding: 0.8rem 1rem;
+      border-bottom: 1px solid #eee;
+    }
+
+    th {
+      background-color: #0078d4;
+      color: white;
+      text-align: left;
+    }
+
+    tr:hover {
+      background-color: #f2f8ff;
+    }
+
+    .btn {
+      padding: 0.4rem 0.8rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .btn-delete {
+      background-color: #e74c3c;
+      color: white;
+    }
+
+    .btn-delete:hover {
+      background-color: #c0392b;
+    }
+
+    .btn-refresh {
+      margin-top: 1rem;
+      background: #16a085;
+      color: white;
+    }
+
+    .btn-refresh:hover {
+      background: #13856b;
+    }
+
+    .status {
+      margin-top: 1rem;
+      text-align: center;
+      font-weight: 600;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+<h1>Multi-Tenant PDF Manager</h1>
+
+<div class="upload-section">
+    <h2>Upload Document</h2>
+    <label for="concept">Select Concept</label>
+    <select id="concept">
+        <option value="">-- Select Concept --</option>
+        <option>MAX</option>
+        <option>LIFESTYLE</option>
+        <option>BABYSHOP</option>
+        <option>HOMECENTRE</option>
+    </select>
+
+    <label for="category">Category</label>
+    <input type="text" id="category" placeholder="e.g. return_policy" />
+
+    <label for="file">Choose PDF File</label>
+    <input type="file" id="file" accept=".pdf" />
+
+    <button onclick="uploadPdf()">Upload</button>
+
+    <div class="status" id="uploadStatus"></div>
+</div>
+
+<h2>All Documents</h2>
+<table id="documentsTable">
+    <thead>
+    <tr>
+        <th>Concept</th>
+        <th>Document ID</th>
+        <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody id="documentsBody">
+    <tr><td colspan="3" style="text-align:center;">No records found.</td></tr>
+    </tbody>
+</table>
+
+<div style="text-align:center;">
+    <button class="btn btn-refresh" onclick="loadDocuments()">🔄 Refresh</button>
+</div>
+
+<script>
+    const API_BASE = "http://localhost:8080/api/admin/documents";
+
+    async function uploadPdf() {
+      const concept = document.getElementById("concept").value.trim();
+      const category = document.getElementById("category").value.trim();
+      const file = document.getElementById("file").files[0];
+      const status = document.getElementById("uploadStatus");
+
+      if (!concept || !category || !file) {
+        status.textContent = "⚠️ Please fill all fields and select a PDF file.";
+        status.style.color = "red";
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("category", category);
+
+      status.textContent = "⏳ Uploading...";
+      status.style.color = "#555";
+
+      try {
+        const res = await fetch(`${API_BASE}/${concept}/upload`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          status.textContent = "✅ " + data.message;
+          status.style.color = "green";
+          loadDocuments();
+        } else {
+          status.textContent = "❌ Upload failed: " + data.message;
+          status.style.color = "red";
+        }
+      } catch (err) {
+        console.error(err);
+        status.textContent = "❌ Error uploading file.";
+        status.style.color = "red";
+      }
+    }
+
+    async function loadDocuments() {
+      const tableBody = document.getElementById("documentsBody");
+      tableBody.innerHTML = "<tr><td colspan='3' style='text-align:center;'>⏳ Loading...</td></tr>";
+
+      try {
+        const res = await fetch(`${API_BASE}/all`);
+        const data = await res.json();
+
+        if (res.ok && data && Object.keys(data).length > 0) {
+          tableBody.innerHTML = "";
+          for (const [concept, ids] of Object.entries(data)) {
+            if (ids.length === 0) {
+              const row = `<tr>
+                            <td>${concept}</td>
+                            <td colspan="2" style="text-align:center;">No documents</td>
+                          </tr>`;
+              tableBody.innerHTML += row;
+            } else {
+              ids.forEach(id => {
+                const row = `<tr>
+                              <td>${concept}</td>
+                              <td>${id}</td>
+                              <td>
+                                <button class="btn btn-delete" onclick="deleteDocument('${concept}','${id}')">🗑️ Delete</button>
+                              </td>
+                            </tr>`;
+                tableBody.innerHTML += row;
+              });
+
+              // Add "Delete All" row
+              tableBody.innerHTML += `<tr style="background:#f9f9f9;">
+                                        <td colspan="3" style="text-align:center;">
+                                          <button class="btn btn-delete" onclick="deleteAll('${concept}')">🧹 Delete All ${concept} Docs</button>
+                                        </td>
+                                      </tr>`;
+            }
+          }
+        } else {
+          tableBody.innerHTML = "<tr><td colspan='3' style='text-align:center;'>No documents found.</td></tr>";
+        }
+      } catch (err) {
+        console.error(err);
+        tableBody.innerHTML = "<tr><td colspan='3' style='text-align:center;color:red;'>❌ Failed to load documents.</td></tr>";
+      }
+    }
+
+    async function deleteDocument(concept, documentId) {
+      if (!confirm(`Delete document ${documentId} from ${concept}?`)) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/${concept}/${documentId}`, { method: "DELETE" });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          alert(`✅ ${data.message}`);
+          loadDocuments();
+        } else {
+          alert(`❌ Failed: ${data.message}`);
+        }
+      } catch (err) {
+        console.error(err);
+        alert("❌ Error deleting document.");
+      }
+    }
+
+    async function deleteAll(concept) {
+      if (!confirm(`⚠️ Delete ALL documents for ${concept}?`)) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/${concept}`, { method: "DELETE" });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          alert(`✅ ${data.message}`);
+          loadDocuments();
+        } else {
+          alert(`❌ Failed: ${data.message}`);
+        }
+      } catch (err) {
+        console.error(err);
+        alert("❌ Error deleting documents.");
+      }
+    }
+
+    // Load table on page load
+    loadDocuments();
+  </script>
+</body>
+</html>
