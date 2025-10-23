@@ -13,7 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Main entry point with caching - Routes user query to appropriate handler
@@ -30,12 +33,16 @@ public class ChatbotService {
     @Autowired
     public ChatbotService(
             IntentClassifier intentClassifier,
-            Map<String, IntentHandler<?>> intentHandlers,
+            List<IntentHandler<?>> handlers,
             GeneralQueryIntentHandler generalQueryHandler,
             CacheManager cacheManager
     ) {
         this.intentClassifier = intentClassifier;
-        this.intentHandlers = intentHandlers;
+        this.intentHandlers = handlers.stream()
+                .collect(Collectors.toMap(
+                        IntentHandler::getIntentType,
+                        Function.identity()
+                ));
         this.generalQueryHandler = generalQueryHandler;
         this.cacheManager = cacheManager;
     }

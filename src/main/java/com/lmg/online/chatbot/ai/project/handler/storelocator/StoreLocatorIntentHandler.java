@@ -65,8 +65,14 @@ public class StoreLocatorIntentHandler implements IntentHandler<StoreList> {
 
     private String buildPrompt(ChatRequest request) {
         return String.format(
-                "%s\nQuery: %s\nCall storeLocatorTool(concept=%s,env=%s,lat=%s,lng=%s)",
-                STORE_FORMAT,
+                """
+                Return only valid JSON in this exact format — no markdown, no extra text:
+                %s
+        
+                Query: %s
+                Call storeLocatorTool(concept=%s,env=%s,lat=%s,lng=%s)
+                """,
+                STORE_FORMAT.trim(),
                 request.getMessage(),
                 request.getConcept(),
                 request.getEnv(),
