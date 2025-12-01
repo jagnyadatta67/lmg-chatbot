@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Factory to create and manage concept-specific vector stores dynamically
  */
 @Slf4j
-@Component
+
 @RequiredArgsConstructor
 public class VectorStoreFactory {
 

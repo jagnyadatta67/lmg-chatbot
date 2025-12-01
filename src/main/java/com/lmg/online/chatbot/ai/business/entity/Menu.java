@@ -19,6 +19,7 @@ public class Menu {
     private String title;         // e.g., "Offline", "Online"
     private boolean active;
     private int  displayOrder;
+    private String  concept;
     @OneToMany(mappedBy = "menu", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<SubMenu> subMenus = new ArrayList<>();
 

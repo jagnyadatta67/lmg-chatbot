@@ -139,4 +139,18 @@ public class ConceptBaseUrlResolver {
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
+
+
+    /** 🔹 Build Token URL: https://<env>.<domain>/landmarkshopscommercews/in/oauth/token */
+    public static String buildTokenUrl(String concept, String env) {
+        String baseUrl = getEnvBaseUrl(concept, env);
+
+        return buildPath(
+                baseUrl,
+                "landmarkshopscommercews",
+                "in",
+                "oauth",
+                "token"
+        );
+    }
 }

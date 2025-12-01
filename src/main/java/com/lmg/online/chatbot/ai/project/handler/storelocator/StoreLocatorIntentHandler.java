@@ -44,13 +44,15 @@ public class StoreLocatorIntentHandler implements IntentHandler<StoreList> {
         log.info("🏪 Handling STORE_LOCATOR intent");
 
         String prompt = buildPrompt(request);
-        ChatResponse response = storeLocatorClient.prompt()
-                .user(prompt)
-                .tools(storeLocatorTool)
-                .call()
-                .chatResponse();
+        StoreList s=    storeLocatorTool.fetchStoreLocator(
+                request.getConcept(), request.getEnv(), "userId", request.getLatitude(), request.getLongitude(), "Desktop"
+        );
+        return ChatbotResponse.<StoreList>builder()
+                .data(s)
+                .intent(getIntentType())
+                .build();
 
-        return buildResponse(response, request, startTime);
+
     }
 
     @Override

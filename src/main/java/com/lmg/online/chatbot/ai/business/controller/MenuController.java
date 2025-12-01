@@ -15,7 +15,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("api/chat")
-@CrossOrigin(origins = "*")
 @Tag(name = "Chatbot Menu API", description = "Operations for chatbot menus and submenus")
 @SecurityRequirement(name = "openid")
 public class MenuController {

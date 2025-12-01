@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
  * Service for managing multi-tenant vector collections
  */
 @Slf4j
-@Service
+
 @RequiredArgsConstructor
 public class MultiTenantVectorService {
 

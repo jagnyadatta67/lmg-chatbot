@@ -130,9 +130,28 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-vector-store-redis</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.httpcomponents.client5</groupId>
+			<artifactId>httpclient5</artifactId>
+		</dependency>
+
+
 	</dependencies>
 	<dependencyManagement>
 		<dependencies>
+			<dependency>
+				<groupId>org.apache.httpcomponents.client5</groupId>
+				<artifactId>httpclient5-parent</artifactId>
+				<version>5.3.1</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
 			<dependency>
 				<groupId>org.springframework.ai</groupId>
 				<artifactId>spring-ai-bom</artifactId>

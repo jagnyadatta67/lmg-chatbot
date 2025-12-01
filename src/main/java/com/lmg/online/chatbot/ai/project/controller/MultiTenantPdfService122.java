@@ -3,6 +3,7 @@ package com.lmg.online.chatbot.ai.project.controller;
 
 
 import com.lmg.online.chatbot.ai.project.doc.vector.config.VectorStoreFactory;
+import com.lmg.online.chatbot.ai.project.doc.vector.config.chroma.VectorStoreFactoryRedis;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
@@ -25,13 +26,13 @@ import java.util.stream.Collectors;
 @Slf4j
 public class MultiTenantPdfService122 {
 
-    private final VectorStoreFactory vectorStoreFactory;
+    private final VectorStoreFactoryRedis vectorStoreFactory;
     private final TokenTextSplitter textSplitter;
 
     // Supported concepts
     private static final Set<String> VALID_CONCEPTS = Set.of("MAX", "LIFESTYLE", "BABYSHOP", "HOMECENTRE");
 
-    public MultiTenantPdfService122(VectorStoreFactory vectorStoreFactory) {
+    public MultiTenantPdfService122(VectorStoreFactoryRedis vectorStoreFactory) {
         this.vectorStoreFactory = vectorStoreFactory;
         this.textSplitter = new TokenTextSplitter(800, 200, 5, 10000, true);
         vectorStoreFactory.initializeAllConcepts();

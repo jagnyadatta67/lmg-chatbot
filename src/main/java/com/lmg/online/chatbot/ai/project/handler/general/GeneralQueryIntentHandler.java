@@ -56,15 +56,30 @@ public class GeneralQueryIntentHandler implements IntentHandler<String> {
     }
 
     private String buildPrompt(String query, ChatRequest request) {
+        String concept = request.getConcept();
+        String phone = ConceptBaseUrlResolver.getPhoneNumber(concept);
+
+        // ✅ Add phone number line only if available
+        String contactLine = (phone != null && !phone.isBlank())
+                ? String.format("For help, call %s. ", phone)
+                : "";
+
         return String.format(
                 "Q: %s\n\n" +
-                        "Provide a short wit all important data, helpful response. " +
-                        "If appropriate, suggest available services: " +
-                        "order tracking, store locator, or policy information. " +
-                        "For complex issues, suggest calling %s for assistance.",
-                query, ConceptBaseUrlResolver.getPhoneNumber(request.getConcept())
+                        "Answer only if the question is about %s (Landmark Stores India) or its online/store services. " +
+                        "If the query is about any other brand, company, or unrelated topic, " +
+                        "do not answer or explain — just reply with: " +
+                        "'😊 Happy shopping with %s! %sEnjoy your experience with us!' " +
+                        "Always stay polite, helpful, and focus only on LS-related topics like orders, stores, or policies.",
+                query,
+                concept,
+                concept,
+                contactLine
         );
     }
+
+
+
 
     private ChatbotResponse<String> buildResponse(
             ChatResponse response, ChatRequest request, long startTime) {

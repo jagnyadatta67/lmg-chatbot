@@ -3,8 +3,10 @@ package com.lmg.online.chatbot.ai.project.controller;
 
 
 
+import com.lmg.online.chatbot.ai.project.doc.vector.config.chroma.VectorStoreFactoryRedis;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -129,6 +131,14 @@ public class MultiTenantPdfController1222 {
         }
     }
 
+    @GetMapping("hit")
+    public ResponseEntity<String> hit(
+            @PathVariable String concept,
+            @PathVariable String documentId) {
+        vectorStoreFactoryRedis.initializeAllConcepts();
+        return ResponseEntity.ok("OK");
+    }
+
     // ====== Response DTOs ======
 
     public record UploadResponse(
@@ -144,4 +154,6 @@ public class MultiTenantPdfController1222 {
             boolean success,
             String message
     ) {}
+@Autowired
+    private VectorStoreFactoryRedis vectorStoreFactoryRedis;
 }

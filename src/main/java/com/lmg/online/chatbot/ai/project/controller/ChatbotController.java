@@ -20,7 +20,7 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/chat")
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class ChatbotController {
 
     private final IntentRouterService intentRouterService;
@@ -37,7 +37,7 @@ public class ChatbotController {
         }
         query+=request.getMessage();
         log.info("📨 Received chat request from user: {} {}", request.getUserId(),request.getAppid());
-        ChatbotResponse<?> response = chatbotService.handleUserQuery(request);
+              ChatbotResponse<?> response = chatbotService.handleUserQuery(request);
         log.info("✅ Sent response with intent: {}, time: {}ms",
                 response.getIntent(), response.getResponseTimeMs());
 

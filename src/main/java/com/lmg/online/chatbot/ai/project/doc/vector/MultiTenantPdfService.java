@@ -2,6 +2,7 @@ package com.lmg.online.chatbot.ai.project.doc.vector;
 
 
 import com.lmg.online.chatbot.ai.project.doc.vector.config.VectorStoreFactory;
+import com.lmg.online.chatbot.ai.project.doc.vector.config.chroma.VectorStoreFactoryRedis;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
@@ -25,8 +26,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class MultiTenantPdfService {
 
-    private final VectorStoreFactory vectorStoreFactory;
-    private final VectorStore orderVectorStore;
+    private final VectorStoreFactoryRedis vectorStoreFactory;
+    private final VectorStore orderVectorStoreRedis;
     private final TokenTextSplitter textSplitter;
 
     // Supported concepts
@@ -35,10 +36,10 @@ public class MultiTenantPdfService {
     );
 
     public MultiTenantPdfService(
-            VectorStoreFactory vectorStoreFactory,
-            VectorStore orderVectorStore) {
+            VectorStoreFactoryRedis vectorStoreFactory,
+            VectorStore orderVectorStoreRedis) {
         this.vectorStoreFactory = vectorStoreFactory;
-        this.orderVectorStore = orderVectorStore;
+        this.orderVectorStoreRedis = orderVectorStoreRedis;
         this.textSplitter = new TokenTextSplitter(800, 200, 5, 10000, true);
 
         // Pre-initialize all concept vector stores
@@ -90,7 +91,7 @@ public class MultiTenantPdfService {
         log.info("📄 Uploading shared order PDF (category: {}, file: {})",
                 category, file.getOriginalFilename());
 
-        return uploadToVectorStore(file, orderVectorStore, "SHARED", category, null);
+        return uploadToVectorStore(file, orderVectorStoreRedis, "SHARED", category, null);
     }
 
     /**

@@ -172,7 +172,9 @@ public class ChatbotService {
         if (request.getUserId() != null) {
             keyBuilder.append(request.getUserId()).append(":");
         }
-
+        if (request.getConcept() != null) {
+            keyBuilder.append(request.getConcept()).append(":");
+        }
         String normalizedMessage = request.getMessage()
                 .toLowerCase()
                 .trim()

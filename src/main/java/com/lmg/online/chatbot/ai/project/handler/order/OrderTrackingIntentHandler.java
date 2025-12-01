@@ -2,6 +2,7 @@ package com.lmg.online.chatbot.ai.project.handler.order;
 
 
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lmg.online.chatbot.ai.analytics.AiAnalyticsService;
 import com.lmg.online.chatbot.ai.analytics.ChatbotResponse;
 import com.lmg.online.chatbot.ai.analytics.TokenCostCalculator;
@@ -15,11 +16,14 @@ import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.stereotype.Component;
 
-import java.util.Objects;
+import java.util.List;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -51,6 +55,7 @@ public class OrderTrackingIntentHandler implements IntentHandler<OrderResponse> 
     private final TokenCostCalculator tokenCostCalculator;
     private final AiAnalyticsService aiAnalyticsService;
     private final BeanOutputConverter<OrderResponse> orderOutputConverter;
+    private final ObjectMapper objectMapper;
 
     @Override
     public ChatbotResponse<OrderResponse> handle(ChatRequest request, long startTime) {
@@ -95,13 +100,52 @@ public class OrderTrackingIntentHandler implements IntentHandler<OrderResponse> 
                 request.getUserId().trim(),
                 request.getAppid(),
                 ORDER_FORMAT);
+        OrderResponse response=orderTrackingTool.getOrderStatus(request.getUserId(),request.getConcept(),request.getEnv(),request.getAppid());
+        return buildChatResponse(response,request);
+    }
 
 
-        return orderTrackClient.prompt()
-                .user(prompt)
-                .tools(orderTrackingTool)
-                .call()
-                .chatResponse();
+
+
+    /**
+     * Build ChatResponse from OrderResponse
+     * Choose one of the methods below based on your needs:
+     */
+
+    // Method 1: Return as JSON string (if frontend expects JSON)
+    private ChatResponse buildChatResponse(OrderResponse orderResponse, ChatRequest request) {
+        try {
+            String jsonContent = objectMapper.writeValueAsString(orderResponse);
+            return createChatResponse(jsonContent);
+        } catch (Exception e) {
+            log.error("Error serializing order response", e);
+            return buildErrorChatResponse("Failed to format order data",request);
+        }
+    }
+
+    /**
+     * Core method to create ChatResponse from content string
+     */
+    private ChatResponse createChatResponse(String content) {
+        AssistantMessage message = new AssistantMessage(content);
+        Generation generation = new Generation(message);
+
+        return new ChatResponse(
+                List.of(generation),
+                ChatResponseMetadata.builder().build()
+        );
+    }
+
+    /**
+     * Build error ChatResponse
+     */
+    private ChatResponse buildErrorChatResponse(String errorMessage, ChatRequest request) {
+        String content = String.format(
+                "I'm sorry, I couldn't retrieve your orders at this time. Please contact our customer care for more details:" +
+                       ConceptBaseUrlResolver.getPhoneNumber(request.getConcept()),
+                errorMessage
+        );
+        return createChatResponse(content);
     }
 
     private ChatResponse handleUnauthenticatedRequest(ChatRequest request) {

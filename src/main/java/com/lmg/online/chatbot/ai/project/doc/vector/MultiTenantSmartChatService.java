@@ -2,6 +2,7 @@ package com.lmg.online.chatbot.ai.project.doc.vector;
 
 import com.lmg.online.chatbot.ai.common.ConceptBaseUrlResolver;
 import com.lmg.online.chatbot.ai.project.doc.vector.config.VectorStoreFactory;
+import com.lmg.online.chatbot.ai.project.doc.vector.config.chroma.VectorStoreFactoryRedis;
 import com.lmg.online.chatbot.ai.request.ChatRequest;
 import io.micrometer.common.util.StringUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -30,9 +31,9 @@ import java.util.stream.Collectors;
 public class MultiTenantSmartChatService {
 
     private final ChatClient.Builder chatClientBuilder;
-    private final VectorStoreFactory vectorStoreFactory;
+    private final VectorStoreFactoryRedis vectorStoreFactory;
 
-    public MultiTenantSmartChatService(ChatClient.Builder chatClientBuilder,  VectorStoreFactory vectorStoreFactory) {
+    public MultiTenantSmartChatService(ChatClient.Builder chatClientBuilder,  VectorStoreFactoryRedis vectorStoreFactory) {
         this.chatClientBuilder = chatClientBuilder;
 
         this.vectorStoreFactory = vectorStoreFactory;
@@ -53,15 +54,26 @@ public class MultiTenantSmartChatService {
                 .limit(3)
                 .collect(Collectors.joining("\n"));
 
+             String phone = ConceptBaseUrlResolver.getPhoneNumber(req.getConcept());
+
+        String safePhone = (phone != null && !phone.isBlank()) ? phone : "our customer care team";
+
         String prompt = String.format(
-                "Context:\n%s\n\nQ: %s\nA: %s",
+                "Context:\n%s\n\n" +
+                        "Q: %s\n\n" +
+                        "A: Answer strictly using the above context.\n" +
+                        "✅ Use short, numbered points (1., 2., 3., etc.) — no paragraphs.\n" +
+                        "✅ Avoid long explanations, filler words, or unrelated info.\n" +
+                        "✅ Be concise, clear, and polite.\n" +
+                        "✅ Always end with this exact line:\n" +
+                        "👉 For more help, contact our customer care: %s",
                 context,
                 req.getMessage(),
-                (StringUtils.isBlank(context) || context.contains("not contain"))
-                        ? "If no specific info found, strictly reply only this — no extra text: 'Please contact our customer care for more details: "
-                        + ConceptBaseUrlResolver.getPhoneNumber(req.getConcept()) + "'."
-                        : "Answer strictly and only from the given context. Respond concisely — short, clear, and meaningful. Avoid long sentences, filler words, or assumptions."
+                safePhone
         );
+
+
+
 
 
 
