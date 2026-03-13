@@ -27,4 +27,19 @@ public interface AiUsageAnalyticsRepository extends JpaRepository<AiUsageAnalyti
     @Query("SELECT a.model, COUNT(a), SUM(a.totalTokens), SUM(a.totalCost) " +
             "FROM AiUsageAnalytics a WHERE a.createdAt >= :start GROUP BY a.model")
     List<Object[]> getUsageByModel(LocalDateTime start);
+
+    /** Recent N rows for the live-query table on the dashboard. */
+    List<AiUsageAnalytics> findTop50ByOrderByCreatedAtDesc();
+
+    /** Recent rows within a time window, newest first. */
+    List<AiUsageAnalytics> findByCreatedAtAfterOrderByCreatedAtDesc(LocalDateTime since);
+
+    /** Avg response time since a point in time. */
+    @Query("SELECT AVG(a.responseTimeMs) FROM AiUsageAnalytics a WHERE a.createdAt >= :start")
+    Double getAvgResponseTimeSince(LocalDateTime start);
+
+    /** Tool-call breakdown since a point in time. */
+    @Query("SELECT a.toolName, COUNT(a) FROM AiUsageAnalytics a " +
+           "WHERE a.createdAt >= :start AND a.toolCalled = true GROUP BY a.toolName")
+    List<Object[]> getToolUsageSince(LocalDateTime start);
 }

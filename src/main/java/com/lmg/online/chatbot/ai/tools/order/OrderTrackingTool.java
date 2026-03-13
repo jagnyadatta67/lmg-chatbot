@@ -2,97 +2,95 @@ package com.lmg.online.chatbot.ai.tools.order;
 
 import com.lmg.online.chatbot.ai.auth.AuthenticationServiceUtil;
 import com.lmg.online.chatbot.ai.common.ConceptBaseUrlResolver;
-import com.lmg.online.chatbot.ai.tools.order.dto.OrderResponse;
-import com.lmg.online.chatbot.ai.tools.order.helper.OrderDataProcessor;
+import com.lmg.online.chatbot.ai.tools.order.dto.HybrisSingleOrderResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
-@Component
+/**
+ * Fetches full details for a single order from Hybris.
+ *
+ * <pre>
+ *   GET /landmarkshopscommercews/v2/{siteId}/en/users/{userId}/orders/{orderNo}
+ *       ?orderRevamp=true&appId={appId}&position=0&fields=DEFAULT
+ *
+ *   Headers:
+ *     Content-Type: application/json
+ *     access_token: {accessToken}          ← Hybris reads token from header
+ *     X-Trace-ID:   {uuid}-A
+ * </pre>
+ *
+ * Returns a typed {@link HybrisSingleOrderResponse} so the handler can map
+ * it directly to {@code OrderResponse} without any AI involvement.
+ * Returns {@code null} on error — the handler converts that to a friendly message.
+ */
 @Slf4j
+@Component
 public class OrderTrackingTool {
+
     @Autowired
-   private AuthenticationServiceUtil authenticationServiceUtil;
+    private AuthenticationServiceUtil authenticationServiceUtil;
 
-    public OrderTrackingTool() {
-    }
-
-
-
-    @Tool(
-            name = "getOrderStatus",
-            description = """
-        Fetches active order details for an authenticated customer.
-        
-        Parameters:
-        - userId (required): The customer's user ID for authentication
-        - concept (required): Business concept/domain (e.g., 'retail', 'grocery')
-        - env (required): Environment identifier (e.g., 'prod', 'staging')
-        - appid (required) : exactly from caller part like (e.g., 'Mobile', 'Desktop','ANDROID', 'IPHONE' "
-        Returns:
-        Structured order information containing:
-        - Customer name and contact details
-        - List of active orders with:
-          * Order number and status
-          * Order date and amount
-          * Product count and items
-          * Delivery information
-        
-        Usage example:
-        getOrderStatus("USER123", "MAX", "prod")
-        
-        Note: All parameters are mandatory. Ensure userId is authenticated before calling.
-        """
-    )
-    public OrderResponse getOrderStatus(
-            @ToolParam(required = true, description = "Customer's unique user identifier")
+    /**
+     * Fetch a single order's details.
+     *
+     * @param userId      Customer's user ID (phone@landmarkmlogindomain.com)
+     * @param accessToken Customer's OAuth access token
+     * @param orderNo     Numeric order number e.g. "9419396447"
+     * @param concept     Brand: LIFESTYLE | MAX | HOMECENTRE | BABYSHOP
+     * @param env         Environment: uat1 | uat5 | prod
+     * @param appid       App: ANDROID | IPHONE | Desktop | Mobile
+     * @return Deserialized order, or {@code null} if the call fails
+     */
+    public HybrisSingleOrderResponse getSingleOrderDetails(
             String userId,
-
-            @ToolParam(required = true, description = "Business concept/domain (e.g., 'MAX', 'LIFESTYLE')")
+            String accessToken,
+            String orderNo,
             String concept,
-
-            @ToolParam(required = true, description = "Environment identifier (e.g., 'prod', 'staging')")
             String env,
-            @ToolParam(required = true, description = "appid for apps  (e.g., 'Mobile', 'Desktop','ANDROID', 'IPHONE' ")
             String appid
     ) {
-        log.info("Toll called for ordertracking with appid {}",appid);
-        Map<String, String> queryParams=new HashMap<>();
-        queryParams.put("orderRefineCode","12");
-        String url= ConceptBaseUrlResolver.buildApiUrl(concept,env,"/en/orders/",appid,queryParams);
+        log.info("🔍 [OrderTrackingTool] orderNo={}, userId={}, concept={}, env={}",
+                orderNo, userId, concept, env);
 
-           HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("token", userId);
         try {
-        OrderResponse res=  authenticationServiceUtil.callWithAuthRetry(appid,url,HttpMethod.GET,headers,null,OrderResponse.class,env).getBody();
-         log.info("Order resp {}",res.toString());
-        OrderDataProcessor.enrichOrderDetails(res,concept,env);
-        return res;
-        } catch (Exception e) {
-            log.error("❌ Error in order tracking for concept {}: {}", concept, e.getMessage(), e);
+            // /en/users/{userId}/orders/{orderNo}
+            String uriPath = "/en/users/" + userId + "/orders/" + orderNo;
 
-            OrderResponse response = new OrderResponse();
-            response.setChat_message(
-                    String.format(
-                            "Please contact our customer care for more details: We are currently unable to serve your request. Call %s for assistance.",
-                            ConceptBaseUrlResolver.getPhoneNumber(concept)
-                    )
-            );
+            Map<String, String> queryParams = new LinkedHashMap<>();
+            queryParams.put("orderRevamp", "true");
+            queryParams.put("position",    "0");
+            queryParams.put("fields",      "DEFAULT");
+
+            String url = ConceptBaseUrlResolver.buildApiUrl(concept, env, uriPath, appid, queryParams);
+            log.info("🌐 [OrderTrackingTool] URL: {}", url);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("access_token", accessToken);
+            headers.set("X-Trace-ID",   UUID.randomUUID().toString() + "-A");
+
+            HybrisSingleOrderResponse response = authenticationServiceUtil
+                    .callWithAuthRetry(appid, url, HttpMethod.GET, headers, null,
+                            HybrisSingleOrderResponse.class, env)
+                    .getBody();
+
+            log.info("✅ [OrderTrackingTool] Fetched order code={} status={}",
+                    response != null ? response.getCode() : "null",
+                    response != null ? response.getStatusDisplay() : "null");
+
             return response;
+
+        } catch (Exception e) {
+            log.error("❌ [OrderTrackingTool] Failed for orderNo={}: {}", orderNo, e.getMessage(), e);
+            return null;  // handler converts null → friendly error message
         }
     }
-    }
-
-
-
+}

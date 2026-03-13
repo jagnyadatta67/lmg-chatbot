@@ -1,73 +1,90 @@
 package com.lmg.online.chatbot.ai.project.handler.order;
 
-
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lmg.online.chatbot.ai.analytics.AiAnalyticsService;
 import com.lmg.online.chatbot.ai.analytics.ChatbotResponse;
-import com.lmg.online.chatbot.ai.analytics.TokenCostCalculator;
-import com.lmg.online.chatbot.ai.analytics.TokenUsage;
-import com.lmg.online.chatbot.ai.common.ConceptBaseUrlResolver;
 import com.lmg.online.chatbot.ai.project.handler.IntentHandler;
 import com.lmg.online.chatbot.ai.request.ChatRequest;
 import com.lmg.online.chatbot.ai.tools.order.OrderTrackingTool;
+import com.lmg.online.chatbot.ai.tools.order.dto.HybrisSingleOrderResponse;
 import com.lmg.online.chatbot.ai.tools.order.dto.OrderResponse;
+import com.lmg.online.chatbot.ai.tools.order.helper.HybrisOrderMapper;
 import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.metadata.ChatResponseMetadata;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import java.util.Collections;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Handles ORDER_TRACKING intent — fetches a single order's details by order number.
+ *
+ * Flow (no AI involved):
+ *   1. Auth guard — userId must be present
+ *   2. Extract order number from request.orderNo or via regex from message text
+ *   3. No order number → return friendly ask message immediately
+ *   4. Call OrderTrackingTool → Hybris REST → HybrisSingleOrderResponse
+ *   5. HybrisOrderMapper converts DTO → OrderResponse (direct field mapping)
+ *   6. Return ChatbotResponse
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class OrderTrackingIntentHandler implements IntentHandler<OrderResponse> {
 
+    /** Fast-path routing: matches obvious order-tracking queries */
     private static final Pattern ORDER_PATTERN = Pattern.compile(
-            ".*\\b(order|track|delivery|shipment|status|where.*order)\\b.*",
+            ".*\\b(track|order\\s*status|where.*order|order.*detail|check.*order|" +
+            "my\\s*order\\s+\\d|order\\s+\\d|\\d{7,12})\\b.*",
             Pattern.CASE_INSENSITIVE
     );
 
-    private static final String ORDER_FORMAT = """
-        Return JSON: {"chat_message":"text","customerName":"name","mobileNo":"phone",
-        "orderDetailsList":[{"orderAmount":0,"orderDate":"date","orderNo":"num","orderStatus":"status",
-        "totalProducts":0,"productName":"name","imageURL":"url","productURL":"url","netAmount":"amt",
-        "color":"col","size":"sz","qty":"q","tat":"t","estmtDate":"date","latestStatus":"st",
-        "returnAllow":false,"exchangeAllow":false,"exchangeDay":"days"}]}
-        """;
+    /** Extracts a 7–12 digit numeric order number from free text */
+    private static final Pattern ORDER_NUMBER_PATTERN =
+            Pattern.compile("\\b(\\d{7,12})\\b");
 
-    private static final String LOGIN_FORMAT = """
-        Anonymous user, for order check please login to your account. If this message we will receive then 
-        response must exact as 
-        "chat_message": Please sign in to continue — once you're logged in, I can fetch your latest details.
-        """;
-
-    private final ChatClient orderTrackClient;
-    private final OrderTrackingTool orderTrackingTool;
-    private final TokenCostCalculator tokenCostCalculator;
+    private final OrderTrackingTool  orderTrackingTool;
     private final AiAnalyticsService aiAnalyticsService;
-    private final BeanOutputConverter<OrderResponse> orderOutputConverter;
-    private final ObjectMapper objectMapper;
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     @Override
     public ChatbotResponse<OrderResponse> handle(ChatRequest request, long startTime) {
+        log.info("📦 Handling ORDER_TRACKING, userId={}", request.getUserId());
 
+        // 1. Auth guard
+        if (!isAuthenticated(request)) {
+            return buildResponse(unauthResponse(), request, startTime);
+        }
 
-        boolean isAuthenticated = isUserAuthenticated(request);
-        log.info("📦 Handling ORDER_TRACKING intent for isAuthenticated {} ",isAuthenticated);
-        ChatResponse response = isAuthenticated
-                ? handleAuthenticatedRequest(request)
-                : handleUnauthenticatedRequest(request);
+        // 2. Extract order number (widget field first, then free-text regex)
+        String orderNo = resolveOrderNumber(request);
+        if (orderNo == null) {
+            log.info("🔢 No order number in message — prompting customer");
+            return buildResponse(askForOrderNumberResponse(), request, startTime);
+        }
 
-        return buildResponse(response, request, startTime);
+        log.info("🔢 Order number: {}", orderNo);
+
+        // 3. Fetch from Hybris (pure REST, no AI)
+        HybrisSingleOrderResponse hybrisData = orderTrackingTool.getSingleOrderDetails(
+                request.getUserId(),
+                request.getAccessToken(),
+                orderNo,
+                request.getConcept(),
+                request.getEnv(),
+                request.getAppid()
+        );
+
+        // 4. Map directly to OrderResponse
+        OrderResponse data = HybrisOrderMapper.toOrderResponse(
+                hybrisData, request.getConcept(), request.getEnv());
+
+        log.info("✅ Mapped {} items for orderNo={}",
+                data.getOrderDetailsList() != null ? data.getOrderDetailsList().size() : 0, orderNo);
+
+        return buildResponse(data, request, startTime);
     }
 
     @Override
@@ -77,131 +94,78 @@ public class OrderTrackingIntentHandler implements IntentHandler<OrderResponse> 
 
     @Override
     public boolean canHandle(String query) {
-        return ORDER_PATTERN.matcher(query.toLowerCase()).matches();
+        return ORDER_PATTERN.matcher(query).matches();
     }
 
-    private boolean isUserAuthenticated(ChatRequest request) {
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-        return StringUtils.isNotEmpty(request.getUserId().trim());
+    private boolean isAuthenticated(ChatRequest request) {
+        return StringUtils.isNotEmpty(request.getUserId())
+                && !request.getUserId().trim().isEmpty();
     }
-
-    private ChatResponse handleAuthenticatedRequest(ChatRequest request) {
-        String prompt = String.format(
-                """
-                Query: %s
-                Call: orderTrackingTool(concept="%s", env="%s", userId="%s", appid="%s")
-                
-                Reply ONLY in this JSON format:
-                 %s
-                """,
-                request.getMessage(),
-                request.getConcept(),
-                request.getEnv(),
-                request.getUserId().trim(),
-                request.getAppid(),
-                ORDER_FORMAT);
-        OrderResponse response=orderTrackingTool.getOrderStatus(request.getUserId(),request.getConcept(),request.getEnv(),request.getAppid());
-        return buildChatResponse(response,request);
-    }
-
-
-
 
     /**
-     * Build ChatResponse from OrderResponse
-     * Choose one of the methods below based on your needs:
+     * Resolves the order number from:
+     * 1. {@code request.orderNo} — explicit widget field (7–12 digits validated)
+     * 2. Regex over {@code request.message} — fallback for free-text input
      */
-
-    // Method 1: Return as JSON string (if frontend expects JSON)
-    private ChatResponse buildChatResponse(OrderResponse orderResponse, ChatRequest request) {
-        try {
-            String jsonContent = objectMapper.writeValueAsString(orderResponse);
-            return createChatResponse(jsonContent);
-        } catch (Exception e) {
-            log.error("Error serializing order response", e);
-            return buildErrorChatResponse("Failed to format order data",request);
+    private String resolveOrderNumber(ChatRequest request) {
+        if (StringUtils.isNotEmpty(request.getOrderNo())) {
+            String candidate = request.getOrderNo().trim();
+            if (candidate.matches("\\d{7,12}")) return candidate;
         }
+        if (StringUtils.isNotEmpty(request.getMessage())) {
+            Matcher m = ORDER_NUMBER_PATTERN.matcher(request.getMessage());
+            if (m.find()) return m.group(1);
+        }
+        return null;
     }
 
-    /**
-     * Core method to create ChatResponse from content string
-     */
-    private ChatResponse createChatResponse(String content) {
-        AssistantMessage message = new AssistantMessage(content);
-        Generation generation = new Generation(message);
+    // ── Pre-built responses ───────────────────────────────────────────────────
 
-        return new ChatResponse(
-                List.of(generation),
-                ChatResponseMetadata.builder().build()
-        );
+    private OrderResponse unauthResponse() {
+        OrderResponse r = new OrderResponse();
+        r.setChat_message(
+                "Please sign in to continue — once logged in I can fetch your order details.");
+        r.setOrderDetailsList(Collections.emptyList());
+        return r;
     }
 
-    /**
-     * Build error ChatResponse
-     */
-    private ChatResponse buildErrorChatResponse(String errorMessage, ChatRequest request) {
-        String content = String.format(
-                "I'm sorry, I couldn't retrieve your orders at this time. Please contact our customer care for more details:" +
-                       ConceptBaseUrlResolver.getPhoneNumber(request.getConcept()),
-                errorMessage
-        );
-        return createChatResponse(content);
+    private OrderResponse askForOrderNumberResponse() {
+        OrderResponse r = new OrderResponse();
+        r.setChat_message(
+                "Please share your order number so I can look it up. " +
+                "Order numbers are numeric, e.g. 9419396447.");
+        r.setOrderDetailsList(Collections.emptyList());
+        return r;
     }
 
-    private ChatResponse handleUnauthenticatedRequest(ChatRequest request) {
-        String prompt = ORDER_FORMAT +
-                "\n User not logged in asking about orders. " +
-                "Response: 'Please log in to view order details.' Set orderDetailsList=[]";
-
-        return orderTrackClient.prompt()
-                .user(prompt)
-                .call()
-                .chatResponse();
-    }
+    // ── Response builder ──────────────────────────────────────────────────────
 
     private ChatbotResponse<OrderResponse> buildResponse(
-            ChatResponse response, ChatRequest request, long startTime) {
+            OrderResponse data, ChatRequest request, long startTime) {
 
         long responseTime = System.currentTimeMillis() - startTime;
-        OrderResponse data = orderOutputConverter.convert(
-                response.getResult().getOutput().getText()
-        );
-
-        TokenUsage tokens = tokenCostCalculator.buildTokenUsage(
-                response.getMetadata().getUsage(),
-                response.getMetadata().getModel()
-        );
-
-        trackAnalytics(request, data, response, responseTime);
-
-        return ChatbotResponse.<OrderResponse>builder()
-                .data(data)
-                .tokenUsage(tokens)
-                .responseTimeMs(responseTime)
-                .intent(getIntentType())
-                .build();
-    }
-
-    private void trackAnalytics(ChatRequest request, OrderResponse data,
-                                ChatResponse response, long responseTime) {
-        var usage = response.getMetadata().getUsage();
 
         aiAnalyticsService.trackUsage(
                 data.getCustomerName(),
                 data.getMobileNo(),
-                request.getMessage(),
-                response.getResult().getOutput().getText(),
-                usage.getPromptTokens().intValue(),
-                usage.getCompletionTokens().intValue(),
-                response.getMetadata().getModel(),
-                response.getResult().getMetadata().getFinishReason(),
-                true,
+                request != null ? request.getMessage() : "",
+                data.getChat_message(),
+                0, 0,
+                "none",
+                "stop",
+                false,
                 "orderTrackingTool",
                 responseTime
         );
 
-        log.info("📊 {} - Tokens: {} (↑{} ↓{}), Time: {}ms",
-                getIntentType(), usage.getTotalTokens(), usage.getPromptTokens(),
-                usage.getCompletionTokens(), responseTime);
+        log.info("📊 {} - Time: {}ms", getIntentType(), responseTime);
+
+        return ChatbotResponse.<OrderResponse>builder()
+                .data(data)
+                .responseTimeMs(responseTime)
+                .intent(getIntentType())
+                .build();
     }
 }

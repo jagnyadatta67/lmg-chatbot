@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chat Menu Admin — Landmark Chatbot</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SortableJS for drag-and-drop -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+  <style>
+    .sortable-ghost  { opacity: 0.4; background: #c7d2fe; }
+    .sortable-chosen { background: #eef2ff; }
+    .drag-handle     { cursor: grab; }
+    .drag-handle:active { cursor: grabbing; }
+    .badge-active   { background:#d1fae5; color:#065f46; }
+    .badge-inactive { background:#fee2e2; color:#991b1b; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+
+<!-- ── HEADER ─────────────────────────────────────────────────────────────── -->
+<header class="bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4">
+  <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">L</div>
+  <div>
+    <h1 class="text-lg font-bold text-gray-800">Chat Menu Admin</h1>
+    <p class="text-xs text-gray-500">Landmark Chatbot — Dynamic Menu &amp; Sub-menu Management</p>
+  </div>
+  <div class="ml-auto flex items-center gap-3">
+    <a href="/admin/ingest.html"    class="text-xs px-3 py-1 rounded border border-gray-300 hover:bg-gray-100">📥 Ingest</a>
+    <a href="/admin/analytics.html" class="text-xs px-3 py-1 rounded border border-gray-300 hover:bg-gray-100">📊 Analytics</a>
+  </div>
+</header>
+
+<!-- ── MAIN ───────────────────────────────────────────────────────────────── -->
+<main class="max-w-5xl mx-auto px-4 py-8 space-y-6">
+
+  <!-- CONCEPT SWITCHER -->
+  <div class="bg-white rounded-xl shadow-sm border p-5">
+    <div class="flex flex-wrap gap-2 items-center">
+      <span class="text-sm font-semibold text-gray-600 mr-2">Concept:</span>
+      <button onclick="selectConcept('HOMECENTRE')" data-concept="HOMECENTRE"
+              class="concept-btn px-4 py-1.5 rounded-full text-sm border border-gray-300 hover:bg-indigo-50">🏠 HOMECENTRE</button>
+      <button onclick="selectConcept('LIFESTYLE')" data-concept="LIFESTYLE"
+              class="concept-btn px-4 py-1.5 rounded-full text-sm border border-gray-300 hover:bg-indigo-50">✨ LIFESTYLE</button>
+      <button onclick="selectConcept('MAX')" data-concept="MAX"
+              class="concept-btn px-4 py-1.5 rounded-full text-sm border border-gray-300 hover:bg-indigo-50">🛍 MAX</button>
+      <button onclick="selectConcept('BABYSHOP')" data-concept="BABYSHOP"
+              class="concept-btn px-4 py-1.5 rounded-full text-sm border border-gray-300 hover:bg-indigo-50">👶 BABYSHOP</button>
+      <input id="customConcept" placeholder="Custom concept…"
+             class="text-sm px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400 w-40" />
+      <button onclick="selectConcept(document.getElementById('customConcept').value)"
+              class="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded">Go</button>
+    </div>
+    <p id="currentConceptLabel" class="mt-2 text-xs text-gray-400">No concept selected</p>
+  </div>
+
+  <!-- MENUS PANEL -->
+  <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+    <div class="flex items-center px-5 py-4 border-b gap-3">
+      <h2 class="font-semibold text-gray-800 flex-1">Menus</h2>
+      <button onclick="openAddMenuModal()"
+              class="text-sm px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded">+ Add Menu</button>
+      <button onclick="loadMenus()"
+              class="text-sm px-3 py-1.5 border border-gray-300 hover:bg-gray-100 rounded">↻ Refresh</button>
+    </div>
+
+    <!-- Menu list (drag-to-reorder) -->
+    <div id="menuList" class="divide-y divide-gray-100 min-h-[60px]">
+      <p class="px-5 py-4 text-sm text-gray-400 italic">Select a concept above to load menus.</p>
+    </div>
+  </div>
+
+</main>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MODALS
+═══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- Add / Edit Menu Modal -->
+<div id="menuModal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+    <h3 id="menuModalTitle" class="text-lg font-bold text-gray-800">Add Menu</h3>
+    <input id="menuModalId" type="hidden" />
+
+    <div class="space-y-3">
+      <div>
+        <label class="text-xs font-medium text-gray-600">Concept *</label>
+        <input id="menuModalConcept" type="text"
+               class="w-full mt-1 text-sm px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
+               placeholder="e.g. HOMECENTRE" />
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Title *</label>
+        <input id="menuModalTitle2" type="text"
+               class="w-full mt-1 text-sm px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
+               placeholder="e.g. Track My Order" />
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Icon (emoji)</label>
+        <input id="menuModalIcon" type="text"
+               class="w-full mt-1 text-sm px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
+               placeholder="e.g. 📦" maxlength="10" />
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="flex-1">
+          <label class="text-xs font-medium text-gray-600">Display Order</label>
+          <input id="menuModalOrder" type="number" value="0"
+                 class="w-full mt-1 text-sm px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        </div>
+        <div class="flex items-center gap-2 mt-5">
+          <input id="menuModalActive" type="checkbox" checked class="w-4 h-4 accent-indigo-600" />
+          <label class="text-sm text-gray-700">Active</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex gap-3 justify-end pt-2">
+      <button onclick="closeMenuModal()"
+              class="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-100">Cancel</button>
+      <button onclick="saveMenu()"
+              class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add / Edit Sub-menu Modal -->
+<div id="subMenuModal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+    <h3 id="subMenuModalTitle" class="text-lg font-bold text-gray-800">Add Sub-menu</h3>
+    <input id="subMenuModalId"     type="hidden" />
+    <input id="subMenuModalMenuId" type="hidden" />
+
+    <div class="space-y-3">
+      <div>
+        <label class="text-xs font-medium text-gray-600">Title *</label>
+        <input id="subMenuModalTitle2" type="text"
+               class="w-full mt-1 text-sm px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
+               placeholder="e.g. Track my order" />
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Icon (emoji)</label>
+        <input id="subMenuModalIcon" type="text"
+               class="w-full mt-1 text-sm px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
+               placeholder="e.g. 🚚" maxlength="10" />
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Intent Key</label>
+        <input id="subMenuModalIntentKey" type="text"
+               class="w-full mt-1 text-sm px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400 font-mono"
+               placeholder="e.g. TRACK_ORDER" />
+        <p class="text-xs text-gray-400 mt-1">
+          Widget dispatches on this key. Leave blank for free-text fallback.<br>
+          Common keys: <code>TRACK_ORDER</code> · <code>GIFT_CARD_BALANCE</code> · <code>NEARBY_STORE</code>
+        </p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="flex-1">
+          <label class="text-xs font-medium text-gray-600">Display Order</label>
+          <input id="subMenuModalOrder" type="number" value="0"
+                 class="w-full mt-1 text-sm px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        </div>
+        <div class="flex items-center gap-2 mt-5">
+          <input id="subMenuModalActive" type="checkbox" checked class="w-4 h-4 accent-indigo-600" />
+          <label class="text-sm text-gray-700">Active</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex gap-3 justify-end pt-2">
+      <button onclick="closeSubMenuModal()"
+              class="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-100">Cancel</button>
+      <button onclick="saveSubMenu()"
+              class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Delete Modal -->
+<div id="confirmModal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+    <h3 class="text-lg font-bold text-gray-800">Confirm Delete</h3>
+    <p id="confirmMsg" class="text-sm text-gray-600"></p>
+    <div class="flex gap-3 justify-end">
+      <button onclick="closeConfirmModal()"
+              class="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-100">Cancel</button>
+      <button id="confirmOkBtn"
+              class="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div id="toast"
+     class="hidden fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all">
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════════════════════════════ -->
+<script>
+  /* ── State ────────────────────────────────────────────────────────────── */
+  let currentConcept = '';
+  let menusData      = [];       // full menu list from last API fetch
+  let menuSortable   = null;     // SortableJS instance for the menu list
+  const subSortables = {};       // SortableJS instances keyed by menuId
+
+  /* ── HTTP helpers ─────────────────────────────────────────────────────── */
+  // Admin endpoints (/api/admin/**) are already public — no API key needed.
+  const BASE = '/api/admin/chatmenu';
+
+  async function apiFetch(url, options = {}) {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+      }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(err.message || res.statusText);
+    }
+    // 204 No Content
+    if (res.status === 204) return null;
+    return res.json();
+  }
+
+  /* ── Concept selector ─────────────────────────────────────────────────── */
+  function selectConcept(c) {
+    if (!c || !c.trim()) { showToast('Enter a concept name', 'error'); return; }
+    currentConcept = c.trim().toUpperCase();
+    document.getElementById('currentConceptLabel').textContent = `Showing concept: ${currentConcept}`;
+
+    // Highlight active button
+    document.querySelectorAll('.concept-btn').forEach(btn => {
+      const active = btn.dataset.concept === currentConcept;
+      btn.classList.toggle('bg-indigo-600', active);
+      btn.classList.toggle('text-white',    active);
+      btn.classList.toggle('border-indigo-600', active);
+    });
+
+    loadMenus();
+  }
+
+  /* ── Load & render menus ──────────────────────────────────────────────── */
+  async function loadMenus() {
+    if (!currentConcept) { showToast('Select a concept first', 'error'); return; }
+
+    const list = document.getElementById('menuList');
+    list.innerHTML = '<p class="px-5 py-4 text-sm text-gray-400 animate-pulse">Loading…</p>';
+
+    try {
+      menusData = await apiFetch(`${BASE}/menus?concept=${encodeURIComponent(currentConcept)}`);
+      renderMenus();
+    } catch (e) {
+      list.innerHTML = `<p class="px-5 py-4 text-sm text-red-500">Error: ${e.message}</p>`;
+    }
+  }
+
+  function renderMenus() {
+    const list = document.getElementById('menuList');
+
+    if (!menusData.length) {
+      list.innerHTML = '<p class="px-5 py-4 text-sm text-gray-400 italic">No menus yet. Click "+ Add Menu" to create one.</p>';
+      return;
+    }
+
+    list.innerHTML = '';
+
+    menusData.forEach(menu => {
+      const wrapper = document.createElement('div');
+      wrapper.id            = `menu-${menu.id}`;
+      wrapper.dataset.id    = menu.id;
+      wrapper.dataset.order = menu.displayOrder;
+      wrapper.className     = 'border-b border-gray-100 last:border-0';
+
+      wrapper.innerHTML = `
+        <!-- Menu header row -->
+        <div class="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 group">
+          <span class="drag-handle text-gray-300 text-lg select-none" title="Drag to reorder">⠿</span>
+          <span class="text-base">${menu.icon || '📋'}</span>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-gray-800 truncate">${escHtml(menu.title)}</p>
+            <p class="text-xs text-gray-400">ID: ${menu.id} · Order: ${menu.displayOrder}</p>
+          </div>
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium ${menu.active ? 'badge-active' : 'badge-inactive'}">
+            ${menu.active ? 'Active' : 'Inactive'}
+          </span>
+          <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onclick="openAddSubMenuModal(${menu.id})"
+                    class="text-xs px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded">
+              + Sub
+            </button>
+            <button onclick="openEditMenuModal(${menu.id})"
+                    class="text-xs px-2 py-1 border border-gray-200 hover:bg-gray-100 rounded">✏️ Edit</button>
+            <button onclick="confirmDeleteMenu(${menu.id}, '${escHtml(menu.title)}')"
+                    class="text-xs px-2 py-1 border border-red-200 hover:bg-red-50 text-red-600 rounded">🗑 Del</button>
+          </div>
+        </div>
+
+        <!-- Sub-menu list -->
+        <div id="sublist-${menu.id}"
+             class="bg-gray-50 divide-y divide-gray-100 ml-10 border-l border-gray-100"
+             data-menu-id="${menu.id}">
+          ${renderSubMenuRows(menu.subMenus, menu.id)}
+        </div>
+      `;
+
+      list.appendChild(wrapper);
+
+      // Init SortableJS for sub-menus
+      const subListEl = document.getElementById(`sublist-${menu.id}`);
+      if (subSortables[menu.id]) subSortables[menu.id].destroy();
+      subSortables[menu.id] = Sortable.create(subListEl, {
+        animation: 150,
+        handle: '.sub-drag-handle',
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        onEnd: () => saveSubMenuOrder(menu.id)
+      });
+    });
+
+    // Init SortableJS for menus
+    if (menuSortable) menuSortable.destroy();
+    menuSortable = Sortable.create(list, {
+      animation: 150,
+      handle: '.drag-handle',
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      onEnd: saveMenuOrder
+    });
+  }
+
+  function renderSubMenuRows(subMenus, menuId) {
+    if (!subMenus || !subMenus.length) {
+      return '<p class="px-5 py-2 text-xs text-gray-400 italic">No sub-menus yet.</p>';
+    }
+    return subMenus.map(sub => `
+      <div class="flex items-center gap-3 px-5 py-2 hover:bg-white group" data-id="${sub.id}">
+        <span class="sub-drag-handle drag-handle text-gray-300 text-sm select-none">⠿</span>
+        <span class="text-sm">${sub.icon || '•'}</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-xs font-medium text-gray-700 truncate">${escHtml(sub.title)}</p>
+          <p class="text-xs text-gray-400 font-mono">${sub.intentKey ? escHtml(sub.intentKey) : '<em class="not-italic text-gray-300">no intent key</em>'}</p>
+        </div>
+        <span class="text-xs px-1.5 py-0.5 rounded-full font-medium ${sub.active ? 'badge-active' : 'badge-inactive'}">
+          ${sub.active ? '✓' : '✗'}
+        </span>
+        <div class="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onclick="openEditSubMenuModal(${sub.id}, ${menuId})"
+                  class="text-xs px-2 py-0.5 border border-gray-200 hover:bg-gray-100 rounded">✏️</button>
+          <button onclick="confirmDeleteSubMenu(${sub.id}, '${escHtml(sub.title)}')"
+                  class="text-xs px-2 py-0.5 border border-red-200 hover:bg-red-50 text-red-600 rounded">🗑</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  /* ── Save order via drag ──────────────────────────────────────────────── */
+  async function saveMenuOrder() {
+    const list = document.getElementById('menuList');
+    const ids  = [...list.children]
+                   .map(el => el.dataset.id)
+                   .filter(Boolean)
+                   .map(Number);
+    try {
+      await apiFetch(`${BASE}/menus/reorder`, {
+        method: 'POST',
+        body:   JSON.stringify({ orderedIds: ids })
+      });
+      showToast('Menu order saved', 'success');
+    } catch (e) {
+      showToast('Failed to save order: ' + e.message, 'error');
+    }
+  }
+
+  async function saveSubMenuOrder(menuId) {
+    const subListEl = document.getElementById(`sublist-${menuId}`);
+    const ids       = [...subListEl.children]
+                        .map(el => el.dataset.id)
+                        .filter(Boolean)
+                        .map(Number);
+    if (!ids.length) return;
+    try {
+      await apiFetch(`${BASE}/menus/${menuId}/submenus/reorder`, {
+        method: 'POST',
+        body:   JSON.stringify({ orderedIds: ids })
+      });
+      showToast('Sub-menu order saved', 'success');
+    } catch (e) {
+      showToast('Failed to save sub-menu order: ' + e.message, 'error');
+    }
+  }
+
+  /* ── Menu Modal ───────────────────────────────────────────────────────── */
+  function openAddMenuModal() {
+    document.getElementById('menuModalTitle').textContent = 'Add Menu';
+    document.getElementById('menuModalId').value          = '';
+    document.getElementById('menuModalConcept').value     = currentConcept;
+    document.getElementById('menuModalTitle2').value      = '';
+    document.getElementById('menuModalIcon').value        = '';
+    document.getElementById('menuModalOrder').value       = 0;
+    document.getElementById('menuModalActive').checked    = true;
+    document.getElementById('menuModal').classList.remove('hidden');
+  }
+
+  function openEditMenuModal(id) {
+    const menu = menusData.find(m => m.id === id);
+    if (!menu) return;
+    document.getElementById('menuModalTitle').textContent = 'Edit Menu';
+    document.getElementById('menuModalId').value          = menu.id;
+    document.getElementById('menuModalConcept').value     = menu.concept;
+    document.getElementById('menuModalTitle2').value      = menu.title;
+    document.getElementById('menuModalIcon').value        = menu.icon  || '';
+    document.getElementById('menuModalOrder').value       = menu.displayOrder;
+    document.getElementById('menuModalActive').checked    = menu.active;
+    document.getElementById('menuModal').classList.remove('hidden');
+  }
+
+  function closeMenuModal() {
+    document.getElementById('menuModal').classList.add('hidden');
+  }
+
+  async function saveMenu() {
+    const id      = document.getElementById('menuModalId').value;
+    const payload = {
+      concept:      document.getElementById('menuModalConcept').value.trim(),
+      title:        document.getElementById('menuModalTitle2').value.trim(),
+      icon:         document.getElementById('menuModalIcon').value.trim(),
+      displayOrder: parseInt(document.getElementById('menuModalOrder').value) || 0,
+      active:       document.getElementById('menuModalActive').checked
+    };
+
+    if (!payload.concept || !payload.title) {
+      showToast('Concept and Title are required', 'error'); return;
+    }
+
+    try {
+      if (id) {
+        await apiFetch(`${BASE}/menus/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        showToast('Menu updated', 'success');
+      } else {
+        await apiFetch(`${BASE}/menus`, { method: 'POST', body: JSON.stringify(payload) });
+        showToast('Menu created', 'success');
+      }
+      closeMenuModal();
+      loadMenus();
+    } catch (e) {
+      showToast('Error: ' + e.message, 'error');
+    }
+  }
+
+  /* ── Sub-menu Modal ───────────────────────────────────────────────────── */
+  function openAddSubMenuModal(menuId) {
+    document.getElementById('subMenuModalTitle').textContent = 'Add Sub-menu';
+    document.getElementById('subMenuModalId').value          = '';
+    document.getElementById('subMenuModalMenuId').value      = menuId;
+    document.getElementById('subMenuModalTitle2').value      = '';
+    document.getElementById('subMenuModalIcon').value        = '';
+    document.getElementById('subMenuModalIntentKey').value   = '';
+    document.getElementById('subMenuModalOrder').value       = 0;
+    document.getElementById('subMenuModalActive').checked    = true;
+    document.getElementById('subMenuModal').classList.remove('hidden');
+  }
+
+  function openEditSubMenuModal(subId, menuId) {
+    // Find the sub-menu in menusData
+    let sub = null;
+    for (const m of menusData) {
+      sub = m.subMenus.find(s => s.id === subId);
+      if (sub) break;
+    }
+    if (!sub) return;
+
+    document.getElementById('subMenuModalTitle').textContent = 'Edit Sub-menu';
+    document.getElementById('subMenuModalId').value          = subId;
+    document.getElementById('subMenuModalMenuId').value      = menuId;
+    document.getElementById('subMenuModalTitle2').value      = sub.title;
+    document.getElementById('subMenuModalIcon').value        = sub.icon       || '';
+    document.getElementById('subMenuModalIntentKey').value   = sub.intentKey  || '';
+    document.getElementById('subMenuModalOrder').value       = sub.displayOrder;
+    document.getElementById('subMenuModalActive').checked    = sub.active;
+    document.getElementById('subMenuModal').classList.remove('hidden');
+  }
+
+  function closeSubMenuModal() {
+    document.getElementById('subMenuModal').classList.add('hidden');
+  }
+
+  async function saveSubMenu() {
+    const id     = document.getElementById('subMenuModalId').value;
+    const menuId = document.getElementById('subMenuModalMenuId').value;
+    const payload = {
+      title:        document.getElementById('subMenuModalTitle2').value.trim(),
+      icon:         document.getElementById('subMenuModalIcon').value.trim(),
+      intentKey:    document.getElementById('subMenuModalIntentKey').value.trim(),
+      displayOrder: parseInt(document.getElementById('subMenuModalOrder').value) || 0,
+      active:       document.getElementById('subMenuModalActive').checked
+    };
+
+    if (!payload.title) { showToast('Title is required', 'error'); return; }
+
+    try {
+      if (id) {
+        await apiFetch(`${BASE}/submenus/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        showToast('Sub-menu updated', 'success');
+      } else {
+        await apiFetch(`${BASE}/menus/${menuId}/submenus`, { method: 'POST', body: JSON.stringify(payload) });
+        showToast('Sub-menu created', 'success');
+      }
+      closeSubMenuModal();
+      loadMenus();
+    } catch (e) {
+      showToast('Error: ' + e.message, 'error');
+    }
+  }
+
+  /* ── Confirm Delete ───────────────────────────────────────────────────── */
+  function confirmDeleteMenu(id, title) {
+    document.getElementById('confirmMsg').textContent = `Delete menu "${title}" and all its sub-menus?`;
+    document.getElementById('confirmOkBtn').onclick   = () => deleteMenu(id);
+    document.getElementById('confirmModal').classList.remove('hidden');
+  }
+
+  function confirmDeleteSubMenu(subId, title) {
+    document.getElementById('confirmMsg').textContent = `Delete sub-menu "${title}"?`;
+    document.getElementById('confirmOkBtn').onclick   = () => deleteSubMenu(subId);
+    document.getElementById('confirmModal').classList.remove('hidden');
+  }
+
+  function closeConfirmModal() {
+    document.getElementById('confirmModal').classList.add('hidden');
+  }
+
+  async function deleteMenu(id) {
+    try {
+      await apiFetch(`${BASE}/menus/${id}`, { method: 'DELETE' });
+      showToast('Menu deleted', 'success');
+      closeConfirmModal();
+      loadMenus();
+    } catch (e) {
+      showToast('Error: ' + e.message, 'error');
+    }
+  }
+
+  async function deleteSubMenu(subId) {
+    try {
+      await apiFetch(`${BASE}/submenus/${subId}`, { method: 'DELETE' });
+      showToast('Sub-menu deleted', 'success');
+      closeConfirmModal();
+      loadMenus();
+    } catch (e) {
+      showToast('Error: ' + e.message, 'error');
+    }
+  }
+
+  /* ── Close modals on backdrop click ──────────────────────────────────── */
+  ['menuModal', 'subMenuModal', 'confirmModal'].forEach(id => {
+    document.getElementById(id).addEventListener('click', function(e) {
+      if (e.target === this) this.classList.add('hidden');
+    });
+  });
+
+  /* ── Toast ────────────────────────────────────────────────────────────── */
+  let toastTimer;
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className   = `fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all
+      ${type === 'error' ? 'bg-red-600' : 'bg-green-600'}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.add('hidden'), 3000);
+  }
+
+  /* ── Utilities ────────────────────────────────────────────────────────── */
+  function escHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>

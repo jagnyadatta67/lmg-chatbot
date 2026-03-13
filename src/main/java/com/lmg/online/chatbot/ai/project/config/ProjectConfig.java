@@ -5,9 +5,15 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.util.concurrent.Executor;
+
 @Configuration
+@EnableAsync
 public class ProjectConfig {
+
     @Bean
     public ObjectMapper objectMapper() {
         ObjectMapper mapper = new ObjectMapper();
@@ -21,4 +27,25 @@ public class ProjectConfig {
         return mapper;
     }
 
+    /**
+     * Dedicated thread pool for URL ingestion jobs.
+     * Kept small intentionally — ingestion is I/O-bound and we don't want
+     * it competing with the main request-serving threads.
+     *
+     * corePoolSize  = 2  — always-on threads ready for immediate jobs
+     * maxPoolSize   = 5  — burst capacity for concurrent ingestion requests
+     * queueCapacity = 50 — backlog before rejection (prevents OOM on bulk submits)
+     */
+    @Bean(name = "ingestExecutor")
+    public Executor ingestExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(5);
+        executor.setQueueCapacity(50);
+        executor.setThreadNamePrefix("url-ingest-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+        executor.initialize();
+        return executor;
+    }
 }

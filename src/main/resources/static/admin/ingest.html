@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vector Ingest Admin — Landmark Chatbot</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .tab-active   { @apply border-b-2 border-blue-600 text-blue-600 font-semibold; }
+    .badge-pending    { background:#fef3c7; color:#92400e; }
+    .badge-processing { background:#dbeafe; color:#1e40af; }
+    .badge-done       { background:#d1fae5; color:#065f46; }
+    .badge-failed     { background:#fee2e2; color:#991b1b; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+
+<!-- ── HEADER ─────────────────────────────────────────────────────────── -->
+<header class="bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4">
+  <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">L</div>
+  <div>
+    <h1 class="text-lg font-bold text-gray-800">Vector Ingest Admin</h1>
+    <p class="text-xs text-gray-500">Landmark Chatbot — Redis Knowledge Base Management</p>
+  </div>
+  <div class="ml-auto flex items-center gap-3">
+    <a href="/admin/analytics.html"
+       class="text-xs px-3 py-1 rounded border border-gray-300 hover:bg-gray-100">📊 Analytics</a>
+    <span id="autoRefreshLabel" class="text-xs text-gray-500">Auto-refresh: <span id="arStatus" class="font-semibold text-green-600">ON</span></span>
+    <button onclick="toggleAutoRefresh()"
+            class="text-xs px-3 py-1 rounded border border-gray-300 hover:bg-gray-100">Toggle</button>
+    <button onclick="loadJobs()"
+            class="text-xs px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">↻ Refresh Jobs</button>
+  </div>
+</header>
+
+<!-- ── MAIN ───────────────────────────────────────────────────────────── -->
+<main class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+
+  <!-- ── INGEST FORMS ─────────────────────────────────────────────────── -->
+  <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+
+    <!-- Tabs -->
+    <div class="flex border-b px-6 pt-4 gap-8">
+      <button id="tab-url"  onclick="switchTab('url')"
+              class="pb-3 text-sm border-b-2 border-blue-600 text-blue-600 font-semibold">
+        🌐 URL Ingest (Option C)
+      </button>
+      <button id="tab-text" onclick="switchTab('text')"
+              class="pb-3 text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+        📋 Paste Text (Option D)
+      </button>
+    </div>
+
+    <!-- ── TAB: URL INGEST ────────────────────────────────────────────── -->
+    <div id="panel-url" class="p-6 space-y-5">
+      <p class="text-sm text-gray-500">
+        Fetches the page, strips nav/header/footer noise with Jsoup, extracts content and stores
+        chunks in Redis. Best for <strong>static HTML pages</strong>.
+        For JS-rendered pages (React/SPA), use Paste Text.
+      </p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- URL -->
+        <div class="md:col-span-2">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Page URL <span class="text-red-500">*</span></label>
+          <input id="url-input" type="url" placeholder="https://www.lifestylestores.com/in/en/helpShipping"
+                 class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+        </div>
+
+        <!-- Concept -->
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Brand / Concept <span class="text-red-500">*</span></label>
+          <select id="url-concept"
+                  class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+            <option value="">— Select concept —</option>
+            <option value="LIFESTYLE">LIFESTYLE</option>
+            <option value="MAX">MAX</option>
+            <option value="BABYSHOP">BABYSHOP</option>
+            <option value="HOMECENTRE">HOMECENTRE</option>
+          </select>
+        </div>
+
+        <!-- Category -->
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Category</label>
+          <select id="url-category"
+                  class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+            <option value="">— Select category —</option>
+            <option value="shipping">Shipping</option>
+            <option value="returns">Returns</option>
+            <option value="exchange">Exchange</option>
+            <option value="payment">Payment</option>
+            <option value="cancellation">Cancellation</option>
+            <option value="general">General</option>
+          </select>
+        </div>
+
+        <!-- Title -->
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Title <span class="text-gray-400">(optional)</span></label>
+          <input id="url-title" type="text" placeholder="e.g. Shipping Policy"
+                 class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+        </div>
+
+        <!-- Selector -->
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">
+            CSS Selector <span class="text-gray-400">(optional — leave blank for auto)</span>
+          </label>
+          <input id="url-selector" type="text" placeholder="e.g. main  or  .help-content  or  #policy-body"
+                 class="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-300" />
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button onclick="submitUrlIngest()"
+                class="px-5 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 flex items-center gap-2">
+          <span id="url-btn-icon">🚀</span>
+          <span id="url-btn-text">Submit URL</span>
+        </button>
+        <span id="url-error" class="text-sm text-red-500 hidden"></span>
+      </div>
+
+      <!-- Job result card -->
+      <div id="url-result" class="hidden rounded-lg border p-4 bg-gray-50 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-semibold text-gray-700">Job Submitted</span>
+          <span id="url-result-status" class="text-xs px-2 py-1 rounded-full font-semibold badge-pending">PENDING</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-xs text-gray-600">
+          <div><span class="font-medium">Job ID:</span> <span id="url-result-jobid" class="font-mono"></span></div>
+          <div><span class="font-medium">Chunks:</span> <span id="url-result-chunks">—</span></div>
+          <div class="col-span-2"><span class="font-medium">URL:</span> <span id="url-result-url"></span></div>
+          <div id="url-result-error-row" class="col-span-2 hidden">
+            <span class="font-medium text-red-600">Error:</span>
+            <span id="url-result-error" class="text-red-600"></span>
+          </div>
+        </div>
+        <div id="url-polling" class="flex items-center gap-2 text-xs text-blue-600">
+          <svg class="spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+          </svg>
+          Polling for updates…
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: TEXT INGEST ───────────────────────────────────────────── -->
+    <div id="panel-text" class="p-6 space-y-5 hidden">
+      <p class="text-sm text-gray-500">
+        Paste clean text copied from the browser. Ideal for <strong>JS-rendered pages</strong> (React/Angular SPAs)
+        where URL fetching can't get the content. Processes synchronously — result shown immediately.
+      </p>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Concept -->
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Brand / Concept <span class="text-red-500">*</span></label>
+          <select id="text-concept"
+                  class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+            <option value="">— Select concept —</option>
+            <option value="LIFESTYLE">LIFESTYLE</option>
+            <option value="MAX">MAX</option>
+            <option value="BABYSHOP">BABYSHOP</option>
+            <option value="HOMECENTRE">HOMECENTRE</option>
+          </select>
+        </div>
+
+        <!-- Title -->
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Title <span class="text-gray-400">(optional)</span></label>
+          <input id="text-title" type="text" placeholder="e.g. Return & Exchange Policy"
+                 class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+        </div>
+
+        <!-- Category -->
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Category</label>
+          <select id="text-category"
+                  class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+            <option value="">— Select category —</option>
+            <option value="shipping">Shipping</option>
+            <option value="returns">Returns</option>
+            <option value="exchange">Exchange</option>
+            <option value="payment">Payment</option>
+            <option value="cancellation">Cancellation</option>
+            <option value="general">General</option>
+          </select>
+        </div>
+
+        <!-- Text area -->
+        <div class="md:col-span-3">
+          <label class="block text-xs font-medium text-gray-600 mb-1">
+            Policy Text <span class="text-red-500">*</span>
+            <span class="text-gray-400 ml-2" id="text-char-count">0 / 200,000 chars</span>
+          </label>
+          <textarea id="text-input" rows="12"
+                    oninput="updateCharCount()"
+                    placeholder="Open the help/policy page in your browser, select all text (Cmd+A), copy (Cmd+C) and paste here..."
+                    class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-y font-mono"></textarea>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button onclick="submitTextIngest()"
+                class="px-5 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-2">
+          <span id="text-btn-icon">💾</span>
+          <span id="text-btn-text">Store Text</span>
+        </button>
+        <button onclick="document.getElementById('text-input').value=''; updateCharCount();"
+                class="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-100">Clear</button>
+        <span id="text-error" class="text-sm text-red-500 hidden"></span>
+      </div>
+
+      <!-- Result -->
+      <div id="text-result" class="hidden rounded-lg border p-4 bg-green-50 space-y-2">
+        <div class="flex items-center gap-2">
+          <span class="text-green-600 text-lg">✅</span>
+          <span class="text-sm font-semibold text-green-800">Text ingested successfully</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-xs text-gray-600">
+          <div><span class="font-medium">Concept:</span> <span id="text-result-concept"></span></div>
+          <div><span class="font-medium">Chunks Stored:</span> <span id="text-result-chunks" class="font-semibold text-green-700"></span></div>
+          <div><span class="font-medium">Category:</span> <span id="text-result-category"></span></div>
+          <div><span class="font-medium">Title:</span> <span id="text-result-title"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── JOBS TABLE ────────────────────────────────────────────────────── -->
+  <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 class="font-semibold text-gray-800">Ingestion Jobs</h2>
+      <div class="flex items-center gap-3">
+        <label class="text-xs text-gray-500">Filter by concept:</label>
+        <select id="filter-concept" onchange="loadJobs()"
+                class="border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-300">
+          <option value="">All</option>
+          <option value="LIFESTYLE">LIFESTYLE</option>
+          <option value="MAX">MAX</option>
+          <option value="BABYSHOP">BABYSHOP</option>
+          <option value="HOMECENTRE">HOMECENTRE</option>
+        </select>
+        <span id="jobs-count" class="text-xs text-gray-400"></span>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b text-xs text-gray-500 uppercase tracking-wide">
+          <tr>
+            <th class="px-4 py-3 text-left">Status</th>
+            <th class="px-4 py-3 text-left">Job ID</th>
+            <th class="px-4 py-3 text-left">Concept</th>
+            <th class="px-4 py-3 text-left">Title / Category</th>
+            <th class="px-4 py-3 text-left">URL</th>
+            <th class="px-4 py-3 text-center">Chunks</th>
+            <th class="px-4 py-3 text-left">Created</th>
+          </tr>
+        </thead>
+        <tbody id="jobs-tbody">
+          <tr>
+            <td colspan="7" class="px-4 py-8 text-center text-gray-400 text-sm">Loading jobs…</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="jobs-empty" class="hidden px-6 py-10 text-center text-gray-400 text-sm">
+      No ingestion jobs found. Submit a URL or paste text above to get started.
+    </div>
+  </div>
+
+</main>
+
+<!-- ── SCRIPTS ─────────────────────────────────────────────────────────── -->
+<script>
+  const API_BASE = '/api/admin/vector/ingest';
+  let autoRefresh = true;
+  let refreshTimer = null;
+  let pollingTimer = null;
+
+  // ── Tab switching ──────────────────────────────────────────────────────
+  function switchTab(tab) {
+    ['url','text'].forEach(t => {
+      document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
+      const btn = document.getElementById(`tab-${t}`);
+      btn.className = t === tab
+        ? 'pb-3 text-sm border-b-2 border-blue-600 text-blue-600 font-semibold'
+        : 'pb-3 text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700';
+    });
+  }
+
+  // ── Char counter ───────────────────────────────────────────────────────
+  function updateCharCount() {
+    const len = document.getElementById('text-input').value.length;
+    document.getElementById('text-char-count').textContent =
+        `${len.toLocaleString()} / 200,000 chars`;
+  }
+
+  // ── Auto-refresh ───────────────────────────────────────────────────────
+  function toggleAutoRefresh() {
+    autoRefresh = !autoRefresh;
+    document.getElementById('arStatus').textContent = autoRefresh ? 'ON' : 'OFF';
+    document.getElementById('arStatus').className = autoRefresh
+        ? 'font-semibold text-green-600' : 'font-semibold text-red-500';
+    if (autoRefresh) startAutoRefresh(); else clearInterval(refreshTimer);
+  }
+
+  function startAutoRefresh() {
+    clearInterval(refreshTimer);
+    refreshTimer = setInterval(loadJobs, 8000);
+  }
+
+  // ── Load jobs table ────────────────────────────────────────────────────
+  async function loadJobs() {
+    const concept = document.getElementById('filter-concept').value;
+    const url = concept ? `${API_BASE}?concept=${concept}` : API_BASE;
+
+    try {
+      const res = await fetch(url);
+      const jobs = await res.json();
+      renderJobs(jobs);
+    } catch (e) {
+      console.error('Failed to load jobs', e);
+    }
+  }
+
+  function renderJobs(jobs) {
+    const tbody = document.getElementById('jobs-tbody');
+    document.getElementById('jobs-count').textContent = `${jobs.length} job(s)`;
+
+    if (!jobs.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400 text-sm">
+        No jobs found. Submit a URL or paste text above.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = jobs.map(j => {
+      const badge = statusBadge(j.status);
+      const shortId = j.jobId ? j.jobId.split('-')[0] + '…' : '—';
+      const url = j.url === 'manual-input' ? '<span class="text-gray-400 italic">manual paste</span>'
+          : `<a href="${j.url}" target="_blank" class="text-blue-600 hover:underline text-xs truncate max-w-xs block" title="${j.url}">${truncate(j.url, 55)}</a>`;
+      const created = j.createdAt ? new Date(j.createdAt).toLocaleString() : '—';
+      const titleCat = [j.title, j.category].filter(Boolean).join(' / ') || '—';
+
+      return `<tr class="border-t hover:bg-gray-50 transition-colors">
+        <td class="px-4 py-3">${badge}</td>
+        <td class="px-4 py-3 font-mono text-xs text-gray-500" title="${j.jobId}">${shortId}</td>
+        <td class="px-4 py-3"><span class="px-2 py-0.5 text-xs rounded bg-gray-100 font-medium">${j.concept || '—'}</span></td>
+        <td class="px-4 py-3 text-xs text-gray-600">${titleCat}</td>
+        <td class="px-4 py-3">${url}</td>
+        <td class="px-4 py-3 text-center font-semibold ${j.chunksStored ? 'text-green-700' : 'text-gray-400'}">${j.chunksStored ?? '—'}</td>
+        <td class="px-4 py-3 text-xs text-gray-400">${created}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function statusBadge(status) {
+    const map = {
+      PENDING:    { cls:'badge-pending',    icon:'⏳' },
+      PROCESSING: { cls:'badge-processing', icon:'⚙️' },
+      DONE:       { cls:'badge-done',       icon:'✅' },
+      FAILED:     { cls:'badge-failed',     icon:'❌' },
+    };
+    const s = map[status] || { cls:'', icon:'?' };
+    return `<span class="text-xs px-2 py-1 rounded-full font-semibold ${s.cls}">${s.icon} ${status}</span>`;
+  }
+
+  function truncate(str, n) {
+    return str.length > n ? str.slice(0, n) + '…' : str;
+  }
+
+  // ── URL Ingest submit ──────────────────────────────────────────────────
+  async function submitUrlIngest() {
+    hideEl('url-error');
+    hideEl('url-result');
+
+    const urlVal    = document.getElementById('url-input').value.trim();
+    const concept   = document.getElementById('url-concept').value;
+    const selector  = document.getElementById('url-selector').value.trim();
+    const title     = document.getElementById('url-title').value.trim();
+    const category  = document.getElementById('url-category').value;
+
+    if (!urlVal)  return showError('url-error', 'URL is required.');
+    if (!concept) return showError('url-error', 'Please select a concept.');
+
+    setLoading('url', true);
+
+    try {
+      const body = { url: urlVal, concept };
+      if (selector) body.selector = selector;
+      if (title)    body.title    = title;
+      if (category) body.category = category;
+
+      const res = await fetch(API_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      const data = await res.json();
+
+      if (res.status === 409) {
+        showError('url-error', '⚠️ ' + (data.message || 'URL already ingested.'));
+        return;
+      }
+      if (!res.ok) {
+        showError('url-error', data.message || `Error ${res.status}`);
+        return;
+      }
+
+      // Show result card and start polling
+      showUrlResult(data);
+      startPolling(data.jobId);
+      loadJobs();
+
+    } catch (e) {
+      showError('url-error', 'Network error: ' + e.message);
+    } finally {
+      setLoading('url', false);
+    }
+  }
+
+  function showUrlResult(job) {
+    document.getElementById('url-result-jobid').textContent  = job.jobId;
+    document.getElementById('url-result-url').textContent    = job.url;
+    document.getElementById('url-result-chunks').textContent = job.chunksStored ?? '—';
+    updateUrlResultStatus(job.status);
+    showEl('url-result');
+  }
+
+  function updateUrlResultStatus(status) {
+    const el  = document.getElementById('url-result-status');
+    el.textContent = status;
+    const map = { PENDING:'badge-pending', PROCESSING:'badge-processing', DONE:'badge-done', FAILED:'badge-failed' };
+    el.className = `text-xs px-2 py-1 rounded-full font-semibold ${map[status] || ''}`;
+  }
+
+  function startPolling(jobId) {
+    clearInterval(pollingTimer);
+    showEl('url-polling');
+
+    pollingTimer = setInterval(async () => {
+      try {
+        const res  = await fetch(`${API_BASE}/${jobId}`);
+        const data = await res.json();
+
+        updateUrlResultStatus(data.status);
+        document.getElementById('url-result-chunks').textContent = data.chunksStored ?? '—';
+
+        if (data.status === 'DONE' || data.status === 'FAILED') {
+          clearInterval(pollingTimer);
+          hideEl('url-polling');
+          if (data.errorMessage) {
+            document.getElementById('url-result-error').textContent = data.errorMessage;
+            showEl('url-result-error-row');
+          }
+          loadJobs();
+        }
+      } catch (e) {
+        console.warn('Polling error', e);
+      }
+    }, 3000);
+  }
+
+  // ── Text Ingest submit ─────────────────────────────────────────────────
+  async function submitTextIngest() {
+    hideEl('text-error');
+    hideEl('text-result');
+
+    const text     = document.getElementById('text-input').value.trim();
+    const concept  = document.getElementById('text-concept').value;
+    const title    = document.getElementById('text-title').value.trim();
+    const category = document.getElementById('text-category').value;
+
+    if (!text)    return showError('text-error', 'Text is required.');
+    if (!concept) return showError('text-error', 'Please select a concept.');
+
+    setLoadingText(true);
+
+    try {
+      const body = { text, concept };
+      if (title)    body.title    = title;
+      if (category) body.category = category;
+
+      const res  = await fetch(`${API_BASE}/text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError('text-error', data.message || `Error ${res.status}`);
+        return;
+      }
+
+      document.getElementById('text-result-concept').textContent  = data.concept;
+      document.getElementById('text-result-chunks').textContent   = data.chunksStored;
+      document.getElementById('text-result-category').textContent = data.category;
+      document.getElementById('text-result-title').textContent    = data.title;
+      showEl('text-result');
+      loadJobs();
+
+    } catch (e) {
+      showError('text-error', 'Network error: ' + e.message);
+    } finally {
+      setLoadingText(false);
+    }
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────
+  function showError(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+  function showEl(id) { document.getElementById(id).classList.remove('hidden'); }
+  function hideEl(id) { document.getElementById(id).classList.add('hidden'); }
+
+  function setLoading(type, on) {
+    document.getElementById(`${type}-btn-icon`).textContent = on ? '' : '🚀';
+    document.getElementById(`${type}-btn-text`).textContent = on ? 'Submitting…' : 'Submit URL';
+  }
+
+  function setLoadingText(on) {
+    document.getElementById('text-btn-icon').textContent = on ? '' : '💾';
+    document.getElementById('text-btn-text').textContent = on ? 'Storing…' : 'Store Text';
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────
+  loadJobs();
+  startAutoRefresh();
+</script>
+</body>
+</html>

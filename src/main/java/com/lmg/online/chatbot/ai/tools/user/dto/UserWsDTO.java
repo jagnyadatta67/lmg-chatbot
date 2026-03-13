@@ -21,6 +21,14 @@ public class UserWsDTO {
     @JsonPropertyDescription("Unique user identifier (email-like format)")
     private String uid;
 
+    @JsonProperty("customerId")
+    @JsonPropertyDescription("Customer ID as returned by getTokenDetails (alias for uid)")
+    private String customerId;
+
+    @JsonProperty("access_token")
+    @JsonPropertyDescription("OAuth access token returned by getTokenDetails")
+    private String accessToken;
+
     @JsonProperty(required = true)
     @JsonPropertyDescription("Customer's email address")
     private String email;

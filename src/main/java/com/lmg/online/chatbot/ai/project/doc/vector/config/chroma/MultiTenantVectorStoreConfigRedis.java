@@ -1,10 +1,8 @@
 package com.lmg.online.chatbot.ai.project.doc.vector.config.chroma;
 
-import com.lmg.online.chatbot.ai.project.doc.vector.config.VectorStoreFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.TokenCountBatchingStrategy;
-import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.redis.RedisVectorStore;
 import org.springframework.ai.vectorstore.redis.RedisVectorStore.MetadataField;
 import org.springframework.beans.factory.annotation.Value;
@@ -84,30 +82,6 @@ public class MultiTenantVectorStoreConfigRedis {
                         MetadataField.tag("category"),
                         MetadataField.tag("source"),
                         MetadataField.numeric("uploadDate")
-                )
-                .batchingStrategy(new TokenCountBatchingStrategy())
-                .build();
-    }
-
-    /**
-     * Shared Order Vector Store (common collection)
-     */
-    @Bean("orderVectorStoreRedis")
-    public VectorStore orderVectorStore(
-            JedisPooled jedisPooled,
-            EmbeddingModel embeddingModel) {
-
-        log.info("🧩 Initializing shared order vector store");
-
-        return RedisVectorStore.builder(jedisPooled, embeddingModel)
-                .indexName("chatbot-orders-idx")
-                .prefix("chatbot:order:")
-                .initializeSchema(initializeSchema)
-                .metadataFields(
-                        MetadataField.tag("orderId"),
-                        MetadataField.tag("customerId"),
-                        MetadataField.tag("status"),
-                        MetadataField.numeric("orderDate")
                 )
                 .batchingStrategy(new TokenCountBatchingStrategy())
                 .build();

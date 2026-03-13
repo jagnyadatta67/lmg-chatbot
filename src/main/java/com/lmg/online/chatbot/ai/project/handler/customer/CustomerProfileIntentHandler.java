@@ -2,84 +2,77 @@ package com.lmg.online.chatbot.ai.project.handler.customer;
 
 import com.lmg.online.chatbot.ai.analytics.AiAnalyticsService;
 import com.lmg.online.chatbot.ai.analytics.ChatbotResponse;
-import com.lmg.online.chatbot.ai.analytics.TokenCostCalculator;
-import com.lmg.online.chatbot.ai.analytics.TokenUsage;
 import com.lmg.online.chatbot.ai.project.handler.IntentHandler;
 import com.lmg.online.chatbot.ai.request.ChatRequest;
 import com.lmg.online.chatbot.ai.tools.user.MyProfileDetailsTool;
 import com.lmg.online.chatbot.ai.tools.user.dto.CustomerProfileResponseDTO;
+import com.lmg.online.chatbot.ai.tools.user.dto.UserWsDTO;
+import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.stereotype.Component;
 
 import java.util.regex.Pattern;
 
+/**
+ * Handles CUSTOMER_PROFILE intent.
+ *
+ * Flow (no AI):
+ *   1. Auth guard — userId must be present
+ *   2. Call MyProfileDetailsTool → Hybris v3 profile API → UserWsDTO
+ *   3. Wrap in CustomerProfileResponseDTO
+ *   4. Return ChatbotResponse
+ *
+ * The widget calls /api/user/profile directly for rendering,
+ * but this response is still returned for non-widget API consumers.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class CustomerProfileIntentHandler implements IntentHandler<CustomerProfileResponseDTO> {
 
-    private static final Pattern CUSTOMER_PROFILE_PATTERN = Pattern.compile(
+    private static final Pattern PROFILE_PATTERN = Pattern.compile(
             ".*\\b(profile|my\\s*profile|account|my\\s*account|personal\\s*details|my\\s*details|" +
-                    "about\\s*me|user\\s*info|my\\s*info|update\\s*profile|edit\\s*profile)\\b.*",
+            "about\\s*me|user\\s*info|my\\s*info|update\\s*profile|edit\\s*profile)\\b.*",
             Pattern.CASE_INSENSITIVE
     );
 
-    private static final String CUSTOMER_PROFILE_FORMAT = """
-        Return JSON: {
-            "chat_message": "text", 
-            "customerProfile": {
-                "name": "full name",
-                "firstName": "first name",
-                "lastName": "last name",
-                "email": "email address",
-                "mobileNo": "phone number",
-                "uid": "unique user id",
-                "gender": "MALE/FEMALE/OTHER",
-                "loyaltyCardNumber": "card number",
-                "signInMobile": "+91xxxxxxxxxx",
-                "defaultAddress": {
-                    "addressType": "Home/Office",
-                    "firstName": "address first name",
-                    "email": "address email",
-                    "cellphone": "mobile number",
-                    "line1": "address line 1",
-                    "line2": "address line 2",
-                    "landmark": "landmark text",
-                    "town": "city/town",
-                    "region": {"name": "KARNATAKA"},
-                    "country": {"name": "India"},
-                    "postalCode": "560037"
-                }
-            }
-        }
-        """;
+    private final MyProfileDetailsTool   myProfileDetailsTool;
+    private final AiAnalyticsService     aiAnalyticsService;
 
-    private static final String LOGIN_FORMAT = """
-        Anonymous user, for profile check please login to your account. If this message we will receive then 
-        response must exact as 
-        "chat_message": Please sign in to continue — once you're logged in, I can fetch your latest details.
-        """;
-
-    private final ChatClient customerProfileClient;
-    private final MyProfileDetailsTool myProfileDetailsTool;
-    private final TokenCostCalculator tokenCostCalculator;
-    private final AiAnalyticsService aiAnalyticsService;
-    private final BeanOutputConverter<CustomerProfileResponseDTO> profileOutputConverter;
+    // ─────────────────────────────────────────────────────────────────────────
 
     @Override
     public ChatbotResponse<CustomerProfileResponseDTO> handle(ChatRequest request, long startTime) {
-        log.info("👤 Handling CUSTOMER_PROFILE intent");
+        log.info("👤 Handling CUSTOMER_PROFILE, userId={}", request.getUserId());
 
-        boolean isAuthenticated = isUserAuthenticated(request);
-        ChatResponse response = isAuthenticated
-                ? handleAuthenticatedRequest(request)
-                : handleUnauthenticatedRequest(request);
+        // 1. Auth guard
+        if (StringUtils.isEmpty(request.getUserId())) {
+            return buildResponse(unauthResponse(), request, startTime);
+        }
 
-        return buildResponse(response, request, startTime);
+        // 2. Direct tool call — no AI
+        UserWsDTO profile = myProfileDetailsTool.getProfile(
+                request.getUserId(),
+                request.getAccessToken(),
+                request.getConcept(),
+                request.getEnv(),
+                request.getAppid()
+        );
+
+        // 3. Wrap in response DTO
+        CustomerProfileResponseDTO data = new CustomerProfileResponseDTO();
+        data.setCustomerProfile(profile);
+
+        // If the tool set an error message, bubble it up
+        if (StringUtils.isNotEmpty(profile.getChat_message())) {
+            data.setChatMessage(profile.getChat_message());
+        }
+
+        log.info("✅ [CUSTOMER_PROFILE] uid={}, email={}",
+                profile.getUid(), profile.getEmail());
+
+        return buildResponse(data, request, startTime);
     }
 
     @Override
@@ -89,85 +82,42 @@ public class CustomerProfileIntentHandler implements IntentHandler<CustomerProfi
 
     @Override
     public boolean canHandle(String query) {
-        return CUSTOMER_PROFILE_PATTERN.matcher(query.toLowerCase()).matches();
+        return PROFILE_PATTERN.matcher(query).matches();
     }
 
-    private boolean isUserAuthenticated(ChatRequest request) {
-        return request.getUserId() != null && !request.getUserId().isEmpty();
-    }
+    // ── Private helpers ───────────────────────────────────────────────────────
 
-    private ChatResponse handleAuthenticatedRequest(ChatRequest request) {
-        String prompt = String.format(
-                "%s\nQuery: %s\nCall myProfileDetailsTool(concept=%s,env=%s,userId=%s,appid=%s) " +
-                        "chat_message should empty if myProfileDetailsTool used " + LOGIN_FORMAT,
-                CUSTOMER_PROFILE_FORMAT,
-                request.getMessage(),
-                request.getConcept(),
-                request.getEnv(),
-                request.getUserId(),
-                request.getAppid()
-        );
-
-        return customerProfileClient.prompt()
-                .user(prompt)
-                .tools(myProfileDetailsTool)
-                .call()
-                .chatResponse();
-    }
-
-    private ChatResponse handleUnauthenticatedRequest(ChatRequest request) {
-        String prompt = CUSTOMER_PROFILE_FORMAT +
-                "\nUser not logged in asking about profile. " +
-                "Response: 'Please log in to view profile details.'";
-
-        return customerProfileClient.prompt()
-                .user(prompt)
-                .call()
-                .chatResponse();
+    private CustomerProfileResponseDTO unauthResponse() {
+        CustomerProfileResponseDTO r = new CustomerProfileResponseDTO();
+        r.setChatMessage(
+                "Please sign in to continue — once logged in I can fetch your profile details.");
+        return r;
     }
 
     private ChatbotResponse<CustomerProfileResponseDTO> buildResponse(
-            ChatResponse response, ChatRequest request, long startTime) {
+            CustomerProfileResponseDTO data, ChatRequest request, long startTime) {
 
         long responseTime = System.currentTimeMillis() - startTime;
-        CustomerProfileResponseDTO data = profileOutputConverter.convert(
-                response.getResult().getOutput().getText()
-        );
-
-        TokenUsage tokens = tokenCostCalculator.buildTokenUsage(
-                response.getMetadata().getUsage(),
-                response.getMetadata().getModel()
-        );
-
-        trackAnalytics(request, response, responseTime);
-
-        return ChatbotResponse.<CustomerProfileResponseDTO>builder()
-                .data(data)
-                .tokenUsage(tokens)
-                .responseTimeMs(responseTime)
-                .intent(getIntentType())
-                .build();
-    }
-
-    private void trackAnalytics(ChatRequest request, ChatResponse response, long responseTime) {
-        var usage = response.getMetadata().getUsage();
 
         aiAnalyticsService.trackUsage(
-                getIntentType(),
-                getIntentType(),
-                request.getMessage(),
-                response.getResult().getOutput().getText(),
-                usage.getPromptTokens().intValue(),
-                usage.getCompletionTokens().intValue(),
-                response.getMetadata().getModel(),
-                response.getResult().getMetadata().getFinishReason(),
-                true,
+                request != null ? request.getUserId() : null,
+                null,
+                request != null ? request.getMessage() : "",
+                data.getChatMessage(),
+                0, 0,
+                "none",
+                "stop",
+                false,
                 "myProfileDetailsTool",
                 responseTime
         );
 
-        log.info("📊 {} - Tokens: {} (↑{} ↓{}), Time: {}ms",
-                getIntentType(), usage.getTotalTokens(), usage.getPromptTokens(),
-                usage.getCompletionTokens(), responseTime);
+        log.info("📊 {} - Time: {}ms", getIntentType(), responseTime);
+
+        return ChatbotResponse.<CustomerProfileResponseDTO>builder()
+                .data(data)
+                .responseTimeMs(responseTime)
+                .intent(getIntentType())
+                .build();
     }
 }

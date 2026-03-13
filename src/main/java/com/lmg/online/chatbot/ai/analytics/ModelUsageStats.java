@@ -4,7 +4,7 @@ import lombok.*;
 
 @Data
 @Builder
-class ModelUsageStats {
+public class ModelUsageStats {
     private String model;
     private Long requestCount;
     private Long totalTokens;

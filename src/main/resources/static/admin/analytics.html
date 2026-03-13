@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analytics Dashboard — Landmark Chatbot</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .spin { animation: spin 1s linear infinite; display:inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .card { @apply bg-white rounded-xl border shadow-sm p-5; }
+    .kpi-val { @apply text-3xl font-bold text-gray-800; }
+    .kpi-lbl { @apply text-xs text-gray-500 mt-1; }
+    .badge { @apply text-xs px-2 py-0.5 rounded-full font-semibold; }
+    tbody tr:hover { background:#f9fafb; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+
+<!-- ── HEADER ─────────────────────────────────────────────────────────── -->
+<header class="bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4">
+  <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">L</div>
+  <div>
+    <h1 class="text-lg font-bold text-gray-800">Analytics Dashboard</h1>
+    <p class="text-xs text-gray-500">Landmark Chatbot — AI Usage & Cost Monitor</p>
+  </div>
+  <div class="ml-auto flex items-center gap-3 flex-wrap">
+    <!-- Period selector -->
+    <label class="text-xs text-gray-500 font-medium">Period:</label>
+    <select id="period" onchange="loadAll()"
+            class="border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
+      <option value="1">Last 1 h</option>
+      <option value="6">Last 6 h</option>
+      <option value="24" selected>Last 24 h</option>
+      <option value="72">Last 3 d</option>
+      <option value="168">Last 7 d</option>
+      <option value="720">Last 30 d</option>
+    </select>
+
+    <!-- Auto-refresh -->
+    <span class="text-xs text-gray-500">Auto: <span id="arStatus" class="font-semibold text-green-600">ON</span></span>
+    <button onclick="toggleAutoRefresh()"
+            class="text-xs px-3 py-1 rounded border border-gray-300 hover:bg-gray-100">Toggle</button>
+    <button onclick="loadAll()"
+            class="text-xs px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700">↻ Refresh</button>
+
+    <!-- Nav links -->
+    <a href="/admin/ingest.html"
+       class="text-xs px-3 py-1 rounded border border-gray-300 hover:bg-gray-100">🗄 Ingest</a>
+  </div>
+</header>
+
+<!-- ── MAIN ───────────────────────────────────────────────────────────── -->
+<main class="max-w-7xl mx-auto px-4 py-8 space-y-8">
+
+  <!-- ── KPI CARDS ──────────────────────────────────────────────────── -->
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div class="bg-white rounded-xl border shadow-sm p-5 col-span-1">
+      <div class="kpi-val text-indigo-600" id="kpi-requests">—</div>
+      <div class="kpi-lbl">Total Requests</div>
+    </div>
+    <div class="bg-white rounded-xl border shadow-sm p-5 col-span-1">
+      <div class="kpi-val text-blue-600" id="kpi-tokens">—</div>
+      <div class="kpi-lbl">Total Tokens</div>
+    </div>
+    <div class="bg-white rounded-xl border shadow-sm p-5 col-span-1">
+      <div class="kpi-val text-green-600" id="kpi-cost">—</div>
+      <div class="kpi-lbl">Total Cost (USD)</div>
+    </div>
+    <div class="bg-white rounded-xl border shadow-sm p-5 col-span-1">
+      <div class="kpi-val text-amber-600" id="kpi-avg-tokens">—</div>
+      <div class="kpi-lbl">Avg Tokens / Req</div>
+    </div>
+    <div class="bg-white rounded-xl border shadow-sm p-5 col-span-1">
+      <div class="kpi-val text-purple-600" id="kpi-avg-cost">—</div>
+      <div class="kpi-lbl">Avg Cost / Req</div>
+    </div>
+    <div class="bg-white rounded-xl border shadow-sm p-5 col-span-1">
+      <div class="kpi-val text-rose-600" id="kpi-avg-rt">—</div>
+      <div class="kpi-lbl">Avg Response (ms)</div>
+    </div>
+  </div>
+
+  <!-- ── MODEL + TOOL BREAKDOWN ─────────────────────────────────────── -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- Model breakdown -->
+    <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b flex items-center justify-between">
+        <h2 class="font-semibold text-gray-800">Model Usage</h2>
+        <span id="model-count" class="text-xs text-gray-400"></span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="px-4 py-3 text-left">Model</th>
+              <th class="px-4 py-3 text-right">Requests</th>
+              <th class="px-4 py-3 text-right">Tokens</th>
+              <th class="px-4 py-3 text-right">Cost (USD)</th>
+              <th class="px-4 py-3 text-right">% of total</th>
+            </tr>
+          </thead>
+          <tbody id="model-tbody">
+            <tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tool breakdown -->
+    <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b flex items-center justify-between">
+        <h2 class="font-semibold text-gray-800">Tool Calls</h2>
+        <span id="tool-total" class="text-xs text-gray-400"></span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="px-4 py-3 text-left">Tool</th>
+              <th class="px-4 py-3 text-right">Calls</th>
+              <th class="px-4 py-3 text-right">% Share</th>
+              <th class="px-4 py-3 text-left">Bar</th>
+            </tr>
+          </thead>
+          <tbody id="tool-tbody">
+            <tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RECENT QUERIES TABLE ───────────────────────────────────────── -->
+  <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+    <div class="px-5 py-4 border-b flex items-center justify-between">
+      <h2 class="font-semibold text-gray-800">Recent Queries</h2>
+      <div class="flex items-center gap-3">
+        <input id="search-input" type="text" placeholder="🔍 Filter…"
+               oninput="filterRows()"
+               class="border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400 w-40" />
+        <span id="query-count" class="text-xs text-gray-400"></span>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b text-xs text-gray-500 uppercase tracking-wide">
+          <tr>
+            <th class="px-4 py-3 text-left">Time</th>
+            <th class="px-4 py-3 text-left">User</th>
+            <th class="px-4 py-3 text-left">Prompt</th>
+            <th class="px-4 py-3 text-left">Model</th>
+            <th class="px-4 py-3 text-right">Tokens</th>
+            <th class="px-4 py-3 text-right">Cost</th>
+            <th class="px-4 py-3 text-right">RT (ms)</th>
+            <th class="px-4 py-3 text-left">Tool</th>
+          </tr>
+        </thead>
+        <tbody id="query-tbody">
+          <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="query-empty" class="hidden px-5 py-10 text-center text-gray-400 text-sm">
+      No queries found for this period.
+    </div>
+  </div>
+
+</main>
+
+<!-- ── SCRIPTS ─────────────────────────────────────────────────────────── -->
+<script>
+  const API = '/api/admin/analytics';
+  let autoRefresh = true;
+  let refreshTimer = null;
+  let allRows = [];   // full recent-query dataset for client-side filtering
+
+  // ── Period helper ──────────────────────────────────────────────────────
+  function hours() { return document.getElementById('period').value; }
+
+  // ── Load all panels in parallel ────────────────────────────────────────
+  async function loadAll() {
+    const h = hours();
+    await Promise.all([loadSummary(h), loadModels(h), loadTools(h), loadRecent(h)]);
+  }
+
+  // ── Summary KPIs ───────────────────────────────────────────────────────
+  async function loadSummary(h) {
+    try {
+      const res  = await fetch(`${API}/summary?hours=${h}`);
+      const data = await res.json();
+      setText('kpi-requests',  fmt(data.totalRequests));
+      setText('kpi-tokens',    fmtK(data.totalTokens));
+      setText('kpi-cost',      '$' + (data.totalCostUsd || 0).toFixed(4));
+      setText('kpi-avg-tokens', Math.round(data.avgTokensPerRequest || 0).toLocaleString());
+      setText('kpi-avg-cost',   '$' + (data.avgCostPerRequest || 0).toFixed(6));
+      setText('kpi-avg-rt',     Math.round(data.avgResponseTimeMs || 0).toLocaleString());
+    } catch(e) { console.error('Summary error', e); }
+  }
+
+  // ── Model breakdown ────────────────────────────────────────────────────
+  async function loadModels(h) {
+    try {
+      const res   = await fetch(`${API}/models?hours=${h}`);
+      const rows  = await res.json();
+      const tbody = document.getElementById('model-tbody');
+      document.getElementById('model-count').textContent = `${rows.length} model(s)`;
+
+      if (!rows.length) {
+        tbody.innerHTML = noData(5, 'No model data for this period.');
+        return;
+      }
+
+      const totalReq = rows.reduce((s, r) => s + (r.requestCount || 0), 0);
+
+      tbody.innerHTML = rows.map(r => {
+        const pct = totalReq > 0 ? ((r.requestCount / totalReq) * 100).toFixed(1) : '0.0';
+        return `<tr class="border-t">
+          <td class="px-4 py-3 font-mono text-xs">${r.model || '—'}</td>
+          <td class="px-4 py-3 text-right">${fmt(r.requestCount)}</td>
+          <td class="px-4 py-3 text-right">${fmtK(r.totalTokens)}</td>
+          <td class="px-4 py-3 text-right text-green-700 font-semibold">$${(r.totalCost || 0).toFixed(4)}</td>
+          <td class="px-4 py-3 text-right">
+            <div class="flex items-center justify-end gap-2">
+              <div class="w-20 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                <div class="bg-indigo-500 h-full rounded-full" style="width:${pct}%"></div>
+              </div>
+              <span class="text-xs text-gray-500">${pct}%</span>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch(e) { console.error('Models error', e); }
+  }
+
+  // ── Tool breakdown ─────────────────────────────────────────────────────
+  async function loadTools(h) {
+    try {
+      const res   = await fetch(`${API}/tools?hours=${h}`);
+      const rows  = await res.json();
+      const tbody = document.getElementById('tool-tbody');
+      const total = rows.reduce((s, r) => s + (r.callCount || 0), 0);
+      document.getElementById('tool-total').textContent = `${fmt(total)} total calls`;
+
+      if (!rows.length) {
+        tbody.innerHTML = noData(4, 'No tool calls in this period.');
+        return;
+      }
+
+      tbody.innerHTML = rows
+        .sort((a, b) => b.callCount - a.callCount)
+        .map(r => {
+          const pct = total > 0 ? ((r.callCount / total) * 100).toFixed(1) : '0.0';
+          return `<tr class="border-t">
+            <td class="px-4 py-3 font-medium text-sm">${r.toolName}</td>
+            <td class="px-4 py-3 text-right font-semibold">${fmt(r.callCount)}</td>
+            <td class="px-4 py-3 text-right text-xs text-gray-500">${pct}%</td>
+            <td class="px-4 py-3">
+              <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                <div class="bg-amber-400 h-full rounded-full" style="width:${pct}%"></div>
+              </div>
+            </td>
+          </tr>`;
+        }).join('');
+    } catch(e) { console.error('Tools error', e); }
+  }
+
+  // ── Recent queries ─────────────────────────────────────────────────────
+  async function loadRecent(h) {
+    try {
+      const res  = await fetch(`${API}/recent?hours=${h}`);
+      allRows    = await res.json();
+      document.getElementById('query-count').textContent = `${allRows.length} queries`;
+      renderQueryRows(allRows);
+    } catch(e) { console.error('Recent error', e); }
+  }
+
+  function filterRows() {
+    const q = document.getElementById('search-input').value.toLowerCase();
+    const filtered = q
+      ? allRows.filter(r =>
+          (r.prompt  || '').toLowerCase().includes(q) ||
+          (r.userId  || '').toLowerCase().includes(q) ||
+          (r.model   || '').toLowerCase().includes(q) ||
+          (r.toolName|| '').toLowerCase().includes(q))
+      : allRows;
+    renderQueryRows(filtered);
+  }
+
+  function renderQueryRows(rows) {
+    const tbody = document.getElementById('query-tbody');
+    document.getElementById('query-count').textContent = `${rows.length} queries`;
+
+    if (!rows.length) {
+      tbody.innerHTML = noData(8, 'No queries found for this period.');
+      return;
+    }
+
+    tbody.innerHTML = rows.map(r => {
+      const ts  = r.createdAt ? fmtTime(r.createdAt) : '—';
+      const usr = r.userId    ? trunc(r.userId, 12)   : '<span class="text-gray-300">anon</span>';
+      const prm = r.prompt    ? escHtml(r.prompt)     : '—';
+      const mdl = r.model     ? `<span class="font-mono text-xs">${trunc(r.model, 18)}</span>` : '—';
+      const tok = r.totalTokens != null ? fmt(r.totalTokens) : '—';
+      const cst = r.totalCostUsd != null ? `$${r.totalCostUsd.toFixed(5)}` : '—';
+      const rt  = r.responseTimeMs != null ? r.responseTimeMs.toLocaleString() : '—';
+      const tool= r.toolCalled
+            ? `<span class="badge bg-amber-100 text-amber-700">${r.toolName || 'tool'}</span>`
+            : '<span class="text-gray-300 text-xs">—</span>';
+      return `<tr class="border-t transition-colors">
+        <td class="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">${ts}</td>
+        <td class="px-4 py-2.5 text-xs text-gray-600">${usr}</td>
+        <td class="px-4 py-2.5 text-xs text-gray-700 max-w-xs truncate" title="${escHtml(r.prompt || '')}">${prm}</td>
+        <td class="px-4 py-2.5">${mdl}</td>
+        <td class="px-4 py-2.5 text-right text-xs">${tok}</td>
+        <td class="px-4 py-2.5 text-right text-xs text-green-700">${cst}</td>
+        <td class="px-4 py-2.5 text-right text-xs">${rt}</td>
+        <td class="px-4 py-2.5">${tool}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Auto-refresh ───────────────────────────────────────────────────────
+  function toggleAutoRefresh() {
+    autoRefresh = !autoRefresh;
+    const el = document.getElementById('arStatus');
+    el.textContent = autoRefresh ? 'ON' : 'OFF';
+    el.className   = autoRefresh ? 'font-semibold text-green-600' : 'font-semibold text-red-500';
+    if (autoRefresh) startAutoRefresh(); else clearInterval(refreshTimer);
+  }
+
+  function startAutoRefresh() {
+    clearInterval(refreshTimer);
+    refreshTimer = setInterval(loadAll, 30_000); // every 30 s
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────
+  function setText(id, val) {
+    document.getElementById(id).textContent = val;
+  }
+
+  function fmt(n) {
+    return n != null ? Number(n).toLocaleString() : '—';
+  }
+
+  function fmtK(n) {
+    if (n == null) return '—';
+    return n >= 1_000_000
+      ? (n / 1_000_000).toFixed(2) + 'M'
+      : n >= 1_000
+        ? (n / 1_000).toFixed(1) + 'K'
+        : n.toLocaleString();
+  }
+
+  function fmtTime(iso) {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short' })
+           + ' ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    } catch { return iso; }
+  }
+
+  function trunc(s, n) {
+    return s && s.length > n ? s.slice(0, n) + '…' : (s || '');
+  }
+
+  function escHtml(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function noData(cols, msg) {
+    return `<tr><td colspan="${cols}" class="px-4 py-8 text-center text-gray-400 text-sm">${msg}</td></tr>`;
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────
+  loadAll();
+  startAutoRefresh();
+</script>
+</body>
+</html>

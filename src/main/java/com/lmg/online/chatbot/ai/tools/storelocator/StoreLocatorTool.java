@@ -42,12 +42,13 @@ public class StoreLocatorTool
             """
     )
 
-    public StoreList fetchStoreLocator(String concept, String env, String userId,double lat,double lng,String appId) {
+    public StoreList fetchStoreLocator(String concept, String env, String userId,double lat,double lng,String appId,String access_token) {
         // Build API URL dynamically
         String url = ConceptBaseUrlResolver.buildApiUrl(concept, env, "/en/storeLocator/",appId);
         // Prepare headers
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("access_token",access_token);
 
         try{
             StoreLocatorAPIResponse res=  authenticationServiceUtil.callWithAuthRetry(appId,url,HttpMethod.POST,headers,null,StoreLocatorAPIResponse.class,env).getBody();

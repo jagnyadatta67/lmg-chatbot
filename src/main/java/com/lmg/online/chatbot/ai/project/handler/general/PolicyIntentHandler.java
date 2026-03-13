@@ -4,21 +4,27 @@ import com.lmg.online.chatbot.ai.analytics.AiAnalyticsService;
 import com.lmg.online.chatbot.ai.analytics.ChatbotResponse;
 import com.lmg.online.chatbot.ai.analytics.TokenCostCalculator;
 import com.lmg.online.chatbot.ai.analytics.TokenUsage;
-import com.lmg.online.chatbot.ai.project.doc.vector.MultiTenantSmartChatService;
+import com.lmg.online.chatbot.ai.common.ConceptBaseUrlResolver;
+import com.lmg.online.chatbot.ai.project.doc.vector.config.chroma.VectorStoreFactoryRedis;
 import com.lmg.online.chatbot.ai.project.handler.IntentHandler;
 import com.lmg.online.chatbot.ai.request.ChatRequest;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class PolicyIntentHandler implements IntentHandler<String> {
-    private final MultiTenantSmartChatService multiTenantSmartChatService;
 
     private static final Pattern POLICY_QUESTION_PATTERN = Pattern.compile(
             ".*\\b(" +
@@ -34,16 +40,30 @@ public class PolicyIntentHandler implements IntentHandler<String> {
             Pattern.CASE_INSENSITIVE
     );
 
+    private static final int SIMILARITY_TOP_K = 5;
 
+    @Autowired
+    @Qualifier("policyClient")
+    private ChatClient policyClient;
 
+    private final VectorStoreFactoryRedis vectorStoreFactory;
     private final TokenCostCalculator tokenCostCalculator;
     private final AiAnalyticsService aiAnalyticsService;
 
+    public PolicyIntentHandler(VectorStoreFactoryRedis vectorStoreFactory,
+                               TokenCostCalculator tokenCostCalculator,
+                               AiAnalyticsService aiAnalyticsService) {
+        this.vectorStoreFactory  = vectorStoreFactory;
+        this.tokenCostCalculator = tokenCostCalculator;
+        this.aiAnalyticsService  = aiAnalyticsService;
+    }
+
+    // ── IntentHandler contract ────────────────────────────────────────────────
 
     @Override
     public ChatbotResponse<String> handle(ChatRequest req, long startTime) {
-        log.info("📋 POLICY_QUESTION");
-        ChatResponse response = multiTenantSmartChatService.handlePolicyQuestion(req);
+        log.info("📋 POLICY_QUESTION for concept={}", req.getConcept());
+        ChatResponse response = handlePolicyQuestion(req);
         return buildResponse(response, req, startTime);
     }
 
@@ -55,6 +75,58 @@ public class PolicyIntentHandler implements IntentHandler<String> {
     @Override
     public boolean canHandle(String query) {
         return POLICY_QUESTION_PATTERN.matcher(query.toLowerCase()).matches();
+    }
+
+    // ── RAG core (inlined from deleted MultiTenantSmartChatService) ──────────
+
+    private ChatResponse handlePolicyQuestion(ChatRequest req) {
+        String concept  = req.getConcept();
+        String question = req.getMessage();
+
+        // 1. Get concept-specific Redis vector store
+        VectorStore vectorStore = vectorStoreFactory.getVectorStore(concept);
+
+        // 2. Retrieve most-relevant policy chunks
+        List<Document> docs = vectorStore.similaritySearch(
+                SearchRequest.builder()
+                        .query(question)
+                        .topK(SIMILARITY_TOP_K)
+                        .build()
+        );
+        log.info("📚 Found {} relevant policy chunks for concept={}", docs.size(), concept);
+
+        // 3. Build grounded prompt and call the policy LLM
+        String prompt = buildRagPrompt(concept, question, docs);
+        return policyClient.prompt()
+                .user(prompt)
+                .call()
+                .chatResponse();
+    }
+
+    private String buildRagPrompt(String concept, String question, List<Document> docs) {
+        String context = docs.isEmpty()
+                ? "No specific policy documents found."
+                : docs.stream()
+                      .map(Document::getText)
+                      .collect(Collectors.joining("\n\n---\n\n"));
+
+        String contactLine = ConceptBaseUrlResolver.getPhoneNumber(concept);
+
+        return String.format("""
+                You are a helpful customer support agent for %s.
+                Use ONLY the policy information provided below to answer the question.
+                If the answer is not in the provided context, say you don't have that information
+                and provide the support contact: %s
+
+                === POLICY CONTEXT ===
+                %s
+                =====================
+
+                Customer question: %s
+
+                Answer helpfully and concisely based on the policy context above.
+                """,
+                concept, contactLine, context, question);
     }
 
 

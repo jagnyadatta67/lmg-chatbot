@@ -12,51 +12,52 @@ import org.springframework.context.annotation.Primary;
 @Configuration
 public class ChatClientConfig {
 
-    @Bean
-    public ChatClient.Builder chatClientBuilder(OpenAiChatModel chatModel) {
-        return ChatClient.builder(chatModel);
-    }
-
- @Bean(name = "generalClient")
+    // General Query ChatClient
+    @Bean(name = "generalClient")
     @Primary
-    public ChatClient basic(ChatClient.Builder builder) {
-        return builder.build();
+    public ChatClient generalQueryClient(OpenAiChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
     }
 
+    // Order Tracking Client
     @Bean(name = "orderTrackClient")
-    public ChatClient orderTrackClient(ChatClient.Builder builder) {
-        return builder.build();
+    public ChatClient orderTrackClient(OpenAiChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
     }
 
-    @Bean(name = "customerProfile")
-    public ChatClient customerProfileClient(ChatClient.Builder builder) {
-        return builder.build();
-    }
-
+    // Store Locator Client
     @Bean(name = "storeLocator")
-    public ChatClient storeLocatorClient(ChatClient.Builder builder) {
-        return builder.build();
+    public ChatClient storeLocatorClient(OpenAiChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
     }
 
+    // Gift Card Client
     @Bean(name = "giftCardClient")
-    public ChatClient giftCardClient(ChatClient.Builder builder) {
-        return builder.build();
+    public ChatClient giftCardClient(OpenAiChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
     }
 
+    // Policy Client
     @Bean(name = "policyClient")
-    public ChatClient policyClient(ChatClient.Builder builder) {
-        return builder.build();
+    public ChatClient policyClient(OpenAiChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
     }
 
-    @Bean(name = "generalQueryClient")
-    public ChatClient generalQueryClient(ChatClient.Builder builder) {
-        return builder.build();
-    }
-
+    // Intent Classifier Client
     @Bean(name = "intentClassifierClient")
-    public ChatClient intentClassifierClient(ChatClient.Builder builder) {
-        return builder.build();
+    public ChatClient intentClassifierClient(OpenAiChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
     }
 
+    // Delivery Tracking Client (AI extracts orderNo + entryPk from message)
+    @Bean(name = "deliveryClient")
+    public ChatClient deliveryClient(OpenAiChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
+    }
 
+    // Return Status Client (AI extracts orderNo + rmaNo from message)
+    @Bean(name = "returnStatusClient")
+    public ChatClient returnStatusClient(OpenAiChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
+    }
 }

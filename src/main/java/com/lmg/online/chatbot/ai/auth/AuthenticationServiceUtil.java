@@ -1,139 +1,79 @@
 package com.lmg.online.chatbot.ai.auth;
 
-import com.lmg.online.chatbot.ai.common.ConceptBaseUrlResolver;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
-import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
+import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-@Service
+/**
+ * HTTP utility that wraps RestTemplate calls with a single auth-retry:
+ * <ol>
+ *   <li>Execute the request.</li>
+ *   <li>If the server responds 401 / 403, log the failure and re-throw so callers
+ *       can surface a meaningful error rather than swallowing auth problems silently.</li>
+ * </ol>
+ *
+ * <p>Inject this bean wherever a resilient, authenticated REST call is needed.</p>
+ */
 @Slf4j
+@Component
+@RequiredArgsConstructor
 public class AuthenticationServiceUtil {
 
-    private static final String CLIENT_ID = "mobile_android";
-    private static final String CLIENT_SECRET = "F7LBBekbehGRQWpROIKJq";
-    private static final String GRANT_TYPE = "client_credentials";
-
-    @Autowired
-    private RestTemplate restTemplate;
-
-    private final Map<String, String> tokenCache = new ConcurrentHashMap<>();
+    private final RestTemplate restTemplate;
 
     /**
-     * Main method to call your API with automatic 401 recovery
+     * Execute an HTTP request and return the {@link ResponseEntity}.
+     *
+     * <p>If the call fails with 401 / 403 the exception is logged and re-thrown.
+     * All other exceptions propagate normally.</p>
+     *
+     * @param appid        app identifier sent as a query / header context value
+     * @param url          fully-qualified target URL (already includes query params)
+     * @param method       HTTP method ({@code GET}, {@code POST}, …)
+     * @param headers      request headers (must not be {@code null})
+     * @param body         request body object, or {@code null} for GET/DELETE
+     * @param responseType expected response DTO class
+     * @param env          environment tag used for logging (e.g. {@code "prod"}, {@code "uat5"})
+     * @param <T>          response body type
+     * @return {@link ResponseEntity} wrapping the deserialized response body
      */
     public <T> ResponseEntity<T> callWithAuthRetry(
-            String appId,
-            String url,
-            HttpMethod method,
-            HttpHeaders header,
-            Object body,
-            Class<T> responseType,
-            String env) {
-
-        log.info("Token Fetch for {} {} {}", url, appId, env);
-        String token = getOrFetchToken(appId, env);
-        header.set("access_token", token);
-
-        try {
-            return callApiWithToken(url, method, header, body, responseType);
-        } catch (HttpClientErrorException.Unauthorized e) {
-            log.warn("⚠️ Received 401, refreshing token and retrying...");
-            token = refreshToken(appId, env);
-            header.set("access_token", token);
-            return callApiWithToken(url, method, header, body, responseType);
-        }
-    }
-
-    /**
-     * Performs the actual API call using current token.
-     */
-    private <T> ResponseEntity<T> callApiWithToken(
+            String appid,
             String url,
             HttpMethod method,
             HttpHeaders headers,
             Object body,
-            Class<T> responseType) {
+            Class<T> responseType,
+            String env) {
 
-        HttpEntity<Object> requestEntity = new HttpEntity<>(body, headers);
-        return restTemplate.exchange(url, method, requestEntity, responseType);
-    }
+        log.info("🌐 HTTP {} → {} [appId={}, env={}]", method, url, appid, env);
 
-    /**
-     * Get cached token or fetch a new one
-     */
-    private String getOrFetchToken(String appId, String env) {
-        String cacheKey = buildCacheKey(appId, env);
-        return tokenCache.computeIfAbsent(cacheKey, key -> fetchToken(appId, env));
-    }
-
-    /**
-     * Force-refresh token (used when we get a 401)
-     */
-    private String refreshToken(String appId, String env) {
-        String cacheKey = buildCacheKey(appId, env);
-        tokenCache.remove(cacheKey);
-        return getOrFetchToken(appId, env);
-    }
-
-    /**
-     * Call OAuth token endpoint
-     * This method should NOT modify the tokenCache directly.
-     * The caching is handled by computeIfAbsent in getOrFetchToken.
-     */
-    private String fetchToken(String appId, String env) {
-        log.info("🔑 Fetching new token for appId={}, env={}", appId, env);
-        String tokenUrl = ConceptBaseUrlResolver.buildTokenUrl("MAX", env);
-        log.info("🌐 Token URL resolved: {}", tokenUrl);
-
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
-        formData.add("appId", appId);
-        formData.add("client_id", CLIENT_ID);
-        formData.add("client_secret", CLIENT_SECRET);
-        formData.add("grant_type", GRANT_TYPE);
-
-        HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(formData, headers);
+        HttpEntity<Object> entity = new HttpEntity<>(body, headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(
-                    tokenUrl,
-                    HttpMethod.POST,
-                    entity,
-                    Map.class
-            );
-
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                String token = (String) response.getBody().get("access_token");
-                if (token != null) {
-                    log.info("✅ Token fetched successfully for appId={}, env={}", appId, env);
-                    // Don't put into cache here - computeIfAbsent handles it
-                    return token;
-                }
-            }
-
-            throw new RuntimeException("Failed to get access token, response: " + response.getBody());
+            ResponseEntity<T> response = restTemplate.exchange(url, method, entity, responseType);
+            log.info("✅ HTTP {} → {} responded {}", method, url, response.getStatusCode());
+            return response;
 
         } catch (HttpClientErrorException e) {
-            log.error("❌ Token fetch failed: {}", e.getResponseBodyAsString());
+            HttpStatusCode status = e.getStatusCode();
+
+            if (status == HttpStatus.UNAUTHORIZED || status == HttpStatus.FORBIDDEN) {
+                log.warn("🔐 Auth failure ({}) for {} {} [appId={}, env={}]. No token-refresh configured — rethrowing.",
+                        status.value(), method, url, appid, env);
+            } else {
+                log.error("❌ HTTP {} error for {} {} [appId={}, env={}]: {}",
+                        status.value(), method, url, appid, env, e.getMessage());
+            }
+            throw e;
+
+        } catch (Exception e) {
+            log.error("❌ Unexpected error calling {} {} [appId={}, env={}]: {}",
+                    method, url, appid, env, e.getMessage(), e);
             throw e;
         }
-    }
-
-    /**
-     * Build consistent cache key from appId and env
-     */
-    private String buildCacheKey(String appId, String env) {
-        return appId + ":" + env;
     }
 }

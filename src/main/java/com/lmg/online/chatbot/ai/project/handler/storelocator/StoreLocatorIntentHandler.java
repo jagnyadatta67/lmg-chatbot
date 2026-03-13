@@ -45,7 +45,7 @@ public class StoreLocatorIntentHandler implements IntentHandler<StoreList> {
 
         String prompt = buildPrompt(request);
         StoreList s=    storeLocatorTool.fetchStoreLocator(
-                request.getConcept(), request.getEnv(), "userId", request.getLatitude(), request.getLongitude(), "Desktop"
+                request.getConcept(), request.getEnv(), "userId", request.getLatitude(), request.getLongitude(), "Desktop",request.getAccessToken()
         );
         return ChatbotResponse.<StoreList>builder()
                 .data(s)

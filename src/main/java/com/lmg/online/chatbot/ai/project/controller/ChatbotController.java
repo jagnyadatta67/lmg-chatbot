@@ -5,6 +5,7 @@ import com.lmg.online.chatbot.ai.analytics.ChatbotResponse;
 import com.lmg.online.chatbot.ai.project.intent.ChatbotService;
 import com.lmg.online.chatbot.ai.project.intent.IntentRouterService;
 import com.lmg.online.chatbot.ai.request.ChatRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -30,7 +31,7 @@ public class ChatbotController {
      * Main endpoint for handling chat requests
      */
     @PostMapping("/chat")
-    public ResponseEntity<ChatbotResponse<?>> handleChat(@RequestBody ChatRequest request) {
+    public ResponseEntity<ChatbotResponse<?>> handleChat(@Valid @RequestBody ChatRequest request) {
         String query="";
         if (StringUtils.isNotEmpty(request.getPreviousResponse())){
             query+=request.getPreviousResponse();
@@ -48,7 +49,7 @@ public class ChatbotController {
 
 
     @PostMapping("/chat/ask")
-    public ChatbotResponse<?> chatGet(@RequestBody ChatRequest request) {
+    public ChatbotResponse<?> chatGet(@Valid @RequestBody ChatRequest request) {
         String query="";
         if (StringUtils.isNotEmpty(request.getPreviousResponse())){
             query+=request.getPreviousResponse();
