@@ -11,7 +11,7 @@
     concept: (scriptTag?.getAttribute("data-concept") || window.CHATBOT_CONFIG?.concept || "LIFESTYLE").toUpperCase(),
     appid: scriptTag?.getAttribute("data-appid") || window.CHATBOT_CONFIG?.appid || "UNKNOWN_APP",
     env: scriptTag?.getAttribute("data-env") || window.CHATBOT_CONFIG?.env || "uat5",
-    giftcardEnv: scriptTag?.getAttribute("data-giftcard-env") || window.CHATBOT_CONFIG?.giftcardEnv || "www",
+    giftcardEnv: scriptTag?.getAttribute("data-env") || window.CHATBOT_CONFIG?.env || "uat5",
     apikey: scriptTag?.getAttribute("X-API-Key") || window.CHATBOT_CONFIG?.apikey || "",
   }
 
@@ -1544,29 +1544,34 @@
         }
 
         const data = json?.data || json
-        const g = data?.giftCardDetails || data
 
-        if (g?.errorOccurred) {
-          const errorReason = g?.errors?.[0]?.message || ""
-          if (errorReason === "lmg.giftcard.card.not.found") {
+        if (data?.errorOccurred) {
+          const errorReason = data?.errors?.[0]?.message || ""
+          if (errorReason.includes("not.found")) {
             renderBotMessage("❌ Invalid gift card number. Please check and try again.")
-          } else if (errorReason === "lmg.giftcard.client.server.error") {
+          } else if (errorReason.includes("server.error")) {
             renderBotMessage("⚠️ Gift card service is currently unavailable. Please try later.")
           } else {
-            renderBotMessage("😔 Unable to fetch your gift card balance. Please try again later.")
+            renderBotMessage(data.chat_message || "😔 Unable to fetch your gift card balance.")
           }
-        } else if (g?.balanceAmount != null) {
-          renderBotMessage(data.chat_message || "Here's your gift card balance:")
-          chatBody.innerHTML += `
-            <div class="bubble bot-bubble" style="border:1px solid ${theme.primary};">
-              <b>Card Number:</b> ${g.cardNumber || "N/A"}<br/>
-              <b>Status:</b> ${g.status || "N/A"}<br/>
-              <b>Message:</b> ${g.message || "N/A"}<br/>
-              <b>Balance:</b> ₹${g.balanceAmount?.toFixed(2) || "0.00"} ${g.currency || "INR"}
-            </div>
-          `
+        } else if (data?.amount != null) {
+          const expiry = data.expiryDate ? data.expiryDate.split("T")[0] : "N/A"
+          const rows = [
+            { label: "Card Number", value: cardNumber || "N/A" },
+            { label: "Balance",     value: data.amount?.formattedValue || "N/A" },
+            { label: "Status",      value: data.active ? "Active" : "Inactive" },
+            { label: "Valid Until", value: expiry },
+          ]
+          const card = document.createElement("div")
+          card.className = "profile-card"
+          card.innerHTML = rows.map((r, i) => `
+            <div class="profile-field"${i === rows.length - 1 ? ' style="border-bottom:none"' : ''}>
+              <span class="profile-label">${r.label}</span>
+              <span class="profile-value">${r.value}</span>
+            </div>`).join("")
+          chatBody.appendChild(card)
         } else {
-          renderBotMessage("😔 Unable to fetch your gift card balance. Please try again later.")
+          renderBotMessage(data?.chat_message || "😔 Unable to fetch your gift card balance.")
         }
 
         renderBackToMenu()

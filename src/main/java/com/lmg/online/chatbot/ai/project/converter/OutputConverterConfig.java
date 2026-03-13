@@ -2,7 +2,6 @@ package com.lmg.online.chatbot.ai.project.converter;
 
 import com.lmg.online.chatbot.ai.project.intent.IntentClassification;
 import com.lmg.online.chatbot.ai.tools.delivery.dto.DeliveryResponse;
-import com.lmg.online.chatbot.ai.tools.giftcard.dto.GiftCardBalanceResponse;
 import com.lmg.online.chatbot.ai.tools.returnstatus.dto.ReturnStatusResponse;
 import com.lmg.online.chatbot.ai.tools.storelocator.dto.StoreList;
 import org.springframework.ai.converter.BeanOutputConverter;
@@ -15,8 +14,8 @@ import org.springframework.context.annotation.Configuration;
  * A BeanOutputConverter is required for every handler that uses AI to parse
  * a structured response (i.e. handlers that call chatClient.prompt().call()).
  * Direct-mapping handlers (OrderTrackingIntentHandler, ChatbotOrderIntentHandler,
- * WalletIntentHandler, CustomerProfileIntentHandler) do NOT need a converter — they
- * map DTO fields directly via tool calls.
+ * WalletIntentHandler, CustomerProfileIntentHandler, GiftCardBalanceIntentHandler)
+ * do NOT need a converter — they map DTO fields directly via tool calls.
  */
 @Configuration
 public class OutputConverterConfig {
@@ -24,11 +23,6 @@ public class OutputConverterConfig {
     @Bean
     public BeanOutputConverter<StoreList> storeLocatorConverter() {
         return new BeanOutputConverter<>(StoreList.class);
-    }
-
-    @Bean
-    public BeanOutputConverter<GiftCardBalanceResponse> giftCardBalanceConverter() {
-        return new BeanOutputConverter<>(GiftCardBalanceResponse.class);
     }
 
     @Bean

@@ -5,9 +5,7 @@ import com.lmg.online.chatbot.ai.common.ConceptBaseUrlResolver;
 import com.lmg.online.chatbot.ai.tools.giftcard.dto.GiftCardBalanceRequest;
 import com.lmg.online.chatbot.ai.tools.giftcard.dto.GiftCardBalanceResponse;
 import com.lmg.online.chatbot.ai.tools.giftcard.dto.GiftCardError;
-import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -16,33 +14,38 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-@Component
-@AllArgsConstructor
+/**
+ * Calls the Hybris gift-card balance endpoint directly (no AI involvement).
+ *
+ * <pre>
+ *   POST /landmarkshopscommercews/v2/{siteId}/en/users/anonymous/gift-card/balance
+ *        ?appId={appId}
+ *
+ *   Headers:
+ *     Content-Type: application/json
+ *     access_token: {accessToken}
+ *
+ *   Body: { "cardNumber": "...", "pin": "..." }
+ * </pre>
+ */
 @Slf4j
+@Component
 public class GiftCardBalanceTool {
 
     @Autowired
     private AuthenticationServiceUtil authenticationServiceUtil;
 
     /**
-     * Tool to check gift card balance
+     * Check the balance on a gift card.
+     *
+     * @param concept     Brand: LIFESTYLE | MAX | HOMECENTRE | BABYSHOP
+     * @param env         Environment: uat1 | uat5 | prod
+     * @param accessToken Customer's OAuth access token (sent in header)
+     * @param appId       App: ANDROID | IPHONE | Desktop | Mobile
+     * @param cardNumber  Gift card number
+     * @param pin         Gift card PIN (may be empty string)
+     * @return Deserialized Hybris response, never null
      */
-    @Tool(
-            name = "giftCardBalance",
-            description = """
-            Fetch the gift card balance details.
-
-            Required Parameters:
-            - concept: Concept name (e.g., LIFESTYLE, MAX, BABYSHOP)
-            - env: Environment prefix (e.g., uat5, stg, prod)
-            - accessToken: Access token (e.g., 'c8695a0d-1a5e-4ff5-b0b1-dbd2707f1ddc')
-            - appId: Application identifier (e.g., 'Mobile', 'Desktop')
-            - cardNumber: Gift card number to check
-            - pin: Gift card pin (if applicable)
-            
-            Returns: GiftCardBalanceResponse return same dto no change
-        """
-    )
     public GiftCardBalanceResponse checkGiftCardBalance(
             String concept,
             String env,
@@ -51,39 +54,58 @@ public class GiftCardBalanceTool {
             String cardNumber,
             String pin) {
 
-        // Build endpoint URL
-        String url = ConceptBaseUrlResolver.buildApiUrl(
-                concept,
-                env,
-                "/en/users/anonymous/gift-card/balance",
-                appId
-        );
-
-        // Prepare headers
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        // Prepare request body
-        GiftCardBalanceRequest request = new GiftCardBalanceRequest(cardNumber, pin);
+        log.info("🎁 [GiftCardBalanceTool] concept={}, env={}, appId={}, card={}",
+                concept, env, appId, maskCard(cardNumber));
 
         try {
-            // Execute call with retry handling
-            GiftCardBalanceResponse giftCardBalanceResponse= authenticationServiceUtil
-                    .callWithAuthRetry(appId, url, HttpMethod.POST, headers, request, GiftCardBalanceResponse.class, env)
+            String url = ConceptBaseUrlResolver.buildApiUrl(
+                    concept, env, "/en/users/anonymous/gift-card/balance", appId);
+
+            log.info("🌐 [GiftCardBalanceTool] URL: {}", url);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("access_token", accessToken);
+
+            GiftCardBalanceRequest body = new GiftCardBalanceRequest(
+                    cardNumber, pin != null ? pin : "");
+
+            GiftCardBalanceResponse response = authenticationServiceUtil
+                    .callWithAuthRetry(appId, url, HttpMethod.POST, headers, body,
+                            GiftCardBalanceResponse.class, env)
                     .getBody();
 
-            return  giftCardBalanceResponse;
+            if (response == null) {
+                return errorResponse(concept, "No response received from server.");
+            }
+
+            log.info("✅ [GiftCardBalanceTool] errorOccurred={}, active={}, amount={}",
+                    response.isErrorOccurred(), response.isActive(),
+                    response.getAmount() != null ? response.getAmount().getFormattedValue() : "null");
+
+            return response;
 
         } catch (Exception e) {
-            log.error("GC error ",e);
-            GiftCardBalanceResponse giftCardBalanceResponse=new GiftCardBalanceResponse();
-            GiftCardError gce=new GiftCardError();
-            gce.setMessage("lmg.giftcard.client.server.error");
-            gce.setReason("lmg.giftcard.client.server.error");
-            giftCardBalanceResponse.setErrors(List.of(gce));
-            return giftCardBalanceResponse;
-
-
+            log.error("❌ [GiftCardBalanceTool] Failed: {}", e.getMessage(), e);
+            return errorResponse(concept, null);
         }
+    }
+
+    private GiftCardBalanceResponse errorResponse(String concept, String detail) {
+        GiftCardBalanceResponse r = new GiftCardBalanceResponse();
+        GiftCardError err = new GiftCardError();
+        err.setMessage("lmg.giftcard.client.server.error");
+        err.setReason("SERVER_ERROR");
+        r.setErrors(List.of(err));
+        r.setChatMessage(detail != null ? detail :
+                "Unable to check gift card balance right now. " +
+                ConceptBaseUrlResolver.getPhoneNumber(concept));
+        return r;
+    }
+
+    /** Mask card number for safe logging — show only last 4 digits */
+    private String maskCard(String cardNumber) {
+        if (cardNumber == null || cardNumber.length() < 4) return "****";
+        return "****" + cardNumber.substring(cardNumber.length() - 4);
     }
 }

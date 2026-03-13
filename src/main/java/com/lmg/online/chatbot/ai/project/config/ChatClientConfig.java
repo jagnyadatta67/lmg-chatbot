@@ -19,21 +19,9 @@ public class ChatClientConfig {
         return ChatClient.builder(chatModel).build();
     }
 
-    // Order Tracking Client
-    @Bean(name = "orderTrackClient")
-    public ChatClient orderTrackClient(OpenAiChatModel chatModel) {
-        return ChatClient.builder(chatModel).build();
-    }
-
     // Store Locator Client
     @Bean(name = "storeLocator")
     public ChatClient storeLocatorClient(OpenAiChatModel chatModel) {
-        return ChatClient.builder(chatModel).build();
-    }
-
-    // Gift Card Client
-    @Bean(name = "giftCardClient")
-    public ChatClient giftCardClient(OpenAiChatModel chatModel) {
         return ChatClient.builder(chatModel).build();
     }
 
