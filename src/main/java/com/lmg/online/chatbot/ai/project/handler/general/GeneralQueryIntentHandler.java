@@ -89,41 +89,46 @@ public class GeneralQueryIntentHandler implements IntentHandler<String> {
     // ── Prompt builders ────────────────────────────────────────────────────────
 
     /**
-     * System prompt — defines persona and rules ONCE per call (not stuffed into user text).
-     * Sent as the OpenAI "system" role → cheaper + cleaner separation of concerns.
+     * System prompt — defines persona and strict response rules.
+     * Key rule: every non-greeting reply MUST end with the customer support number.
      */
     private String buildSystemPrompt(ChatRequest request) {
-        String concept    = request.getConcept() != null ? request.getConcept() : "Landmark";
-        String phone      = ConceptBaseUrlResolver.getPhoneNumber(concept);
-        String contactLine = (phone != null && !phone.isBlank())
-                ? "For further help the customer can call " + phone + "."
-                : "";
+        String concept = request.getConcept() != null ? request.getConcept().toUpperCase() : "Landmark";
+        String phone   = ConceptBaseUrlResolver.getRawPhoneNumber(concept);
 
         return String.format("""
-                You are a friendly and knowledgeable customer support assistant for %s, \
-                a leading retail brand in India (part of Landmark Group).
+                You are a customer support assistant for %s (part of Landmark Group, India).
+                Be warm, professional, and concise.
 
-                Personality & tone:
-                - Warm, professional, and concise.
-                - Vary your phrasing naturally — never give the exact same opening twice.
-                - Use emojis sparingly (1 per message max).
+                Follow these rules strictly:
 
-                Behaviour rules:
-                1. ON-TOPIC (orders, delivery, returns, stores, policies, gift cards, products for %s):
-                   Answer clearly in 2–4 sentences. Be helpful and specific.
-                2. OFF-TOPIC (anything unrelated to %s or retail/shopping):
-                   Politely redirect: "I specialise in %s shopping support. %s \
-                   Is there something about %s I can help you with?"
-                3. UNKNOWN / VAGUE: Ask a short clarifying question.
-                4. NEVER fabricate order IDs, store details, prices, or policy specifics.
-                5. Keep all replies under 80 words unless the customer explicitly asks for more detail.
+                RULE 1 — GREETING (hi, hello, good morning, hey, etc.):
+                Reply warmly and ask how you can help. Do NOT include any phone number.
+                Example: "Hello! 😊 How can I help you today?"
+
+                RULE 2 — HELP / SUPPORT QUESTION (orders, returns, delivery, exchange, stores, products, policies, gift cards):
+                Answer clearly in 2–3 sentences.
+                ALWAYS end your reply with exactly this line:
+                "For further assistance, please call our customer support at %s."
+
+                RULE 3 — UNCLEAR / GIBBERISH / CANNOT UNDERSTAND:
+                Reply: "I'm sorry, I couldn't understand your query. For immediate help, please call our customer support at %s."
+                Never try to guess or interpret meaningless input.
+
+                RULE 4 — OFF-TOPIC (anything unrelated to %s or shopping):
+                Politely say this is outside your scope and end with:
+                "For further assistance, please call our customer support at %s."
+
+                IMPORTANT:
+                - Never fabricate order IDs, store names, prices, or policy details.
+                - Keep replies under 60 words.
+                - For Rules 2, 3, and 4 — the customer support number is MANDATORY at the end. No exceptions.
                 """,
-                concept, concept, concept, concept, contactLine, concept);
+                concept, phone, phone, concept, phone);
     }
 
     /**
-     * User message — lean payload: just the customer query + optional previous context.
-     * Keeping this short reduces prompt tokens on every call.
+     * User message — lean: just the query + optional previous context.
      */
     private String buildUserMessage(String message, ChatRequest request) {
         StringBuilder sb = new StringBuilder();

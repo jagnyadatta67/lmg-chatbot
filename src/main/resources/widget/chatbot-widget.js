@@ -333,9 +333,10 @@
 
       /* Message Bubbles */
       .bubble {
-        display: flex;
+        display: block;
         animation: fadeIn 0.3s ease-out;
         word-wrap: break-word;
+        overflow-wrap: break-word;
         max-width: 85%;
       }
 
@@ -373,18 +374,14 @@
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
       }
 
-      /* Input Container */
+      /* Input Container — always visible */
       #chat-input-container {
-        display: none;
+        display: flex;
         border-top: 1px solid #e5e7eb;
         padding: 12px;
         gap: 8px;
         background: white;
         flex-shrink: 0;
-      }
-
-      #chat-input-container.active {
-        display: flex;
       }
 
       #chat-input {
@@ -728,6 +725,85 @@
         opacity: 0.9;
       }
 
+      /* Write to Us Form */
+      .write-us-form {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 16px;
+        margin: 8px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .write-us-form h4 {
+        margin: 0 0 4px;
+        font-size: 14px;
+        color: ${theme.primary};
+        font-weight: 700;
+      }
+
+      .write-us-form p {
+        margin: 0 0 4px;
+        font-size: 12px;
+        color: #777;
+      }
+
+      .write-us-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .write-us-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #555;
+      }
+
+      .write-us-input,
+      .write-us-select,
+      .write-us-textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px 10px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        font-size: 13px;
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      .write-us-input:focus,
+      .write-us-select:focus,
+      .write-us-textarea:focus {
+        border-color: ${theme.primary};
+        box-shadow: 0 0 0 3px rgba(${hexToRgb(theme.primary)}, 0.1);
+      }
+
+      .write-us-textarea {
+        resize: vertical;
+        min-height: 80px;
+      }
+
+      .write-us-submit {
+        background: ${theme.primary};
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+        transition: opacity 0.2s;
+      }
+
+      .write-us-submit:hover { opacity: 0.9; }
+      .write-us-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
       /* Responsive Design */
       @media (max-width: 480px) {
         #chatbot-button {
@@ -814,6 +890,26 @@
     const sendButton = chatWindow.querySelector("#chat-send")
     const loader = chatWindow.querySelector(".chat-loader")
 
+    // ── Global free-text send (wired ONCE via addEventListener — never duplicates) ──
+    // Each submenu that needs its own handler assigns sendButton.onclick (overrides this)
+    // and clears it back to null when done. This global handler fires ONLY when
+    // sendButton.onclick is null (i.e. no submenu has taken over the button).
+    function globalSendHandler() {
+      if (sendButton.onclick) return   // a submenu has registered its own handler
+      const msg = inputField.value.trim()
+      if (!msg) return
+      renderUserMessage(msg)
+      inputField.value = ""
+      inputField.disabled = true
+      sendButton.disabled = true
+      inputField.placeholder = "Please wait..."
+      handleFreeTextSend(msg)
+    }
+    sendButton.addEventListener("click", globalSendHandler)
+    inputField.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") globalSendHandler()
+    })
+
     function showLoader(message = "Please wait...") {
       const loaderText = loader.querySelector(".chat-loader-text")
       if (loaderText) loaderText.textContent = message
@@ -822,6 +918,14 @@
 
     function hideLoader() {
       loader.classList.remove("active")
+    }
+
+    /** Re-enable the chat input bar after any response so the user can type again */
+    function enableInput(placeholder) {
+      inputField.disabled = false
+      sendButton.disabled = false
+      inputField.placeholder = placeholder || "Type your message..."
+      inputField.focus()
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1011,13 +1115,42 @@
           {
             concept:     config.concept,
             env:         config.env,
-            appId:       config.appid, // note: backend expects capital-I "appId"
+            appId:       config.appid,
             userId:      session.customerId,
             accessToken: session.accessToken,
             ...params,
           },
           "Finding stores...",
         )
+      },
+
+      /**
+       * Submit a Write-to-Us support ticket.
+       * Uses /api/support/ticket (separate from /api/chat).
+       */
+      async submitTicket(ticketData) {
+        const backendBase = config.backend.replace(/\/api\/chat.*$/, "")
+        showLoader("Sending your message…")
+        try {
+          const res = await fetch(`${backendBase}/api/support/ticket`, {
+            method:  "POST",
+            headers: { "Content-Type": "application/json", "X-API-Key": config.apikey },
+            body: JSON.stringify({
+              ...ticketData,
+              concept: config.concept,
+              userId:  session.customerId || null,
+              appid:   config.appid,
+              env:     config.env,
+            }),
+          })
+          hideLoader()
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          const data = await res.json()
+          return { data, error: null }
+        } catch (e) {
+          hideLoader()
+          return { data: null, error: e.message }
+        }
       },
     }
     // ─────────────────────────────────────────────────────────────────────────
@@ -1076,31 +1209,227 @@
       }
     }
 
+    /**
+     * Opens the bottom input bar for collecting an order number.
+     * Used by INTENT_HANDLERS when the AI response signals "needs input"
+     * (i.e. chatMessage is present but no real data was returned).
+     *
+     * @param {string} placeholder  — input field hint text
+     * @param {function} onSubmit   — called with the trimmed message string
+     */
+    /**
+     * Opens the bottom input bar to collect user input for a specific intent.
+     * No client-side validation — backend decides if the input is valid and
+     * responds accordingly (asks again, shows data, or shows an error).
+     *
+     * Widget responsibility: collect input + show it as user bubble + send to backend.
+     * Backend responsibility: validate, extract params, call tool, decide what to render.
+     */
+    function openOrderInput(placeholder, onSubmit) {
+      enableInput(placeholder)
+      sendButton.onclick   = null
+      inputField.onkeydown = null
+
+      const doSend = () => {
+        const msg = inputField.value.trim()
+        if (!msg) return                         // only guard: must not be empty
+
+        renderUserMessage(msg)
+        inputField.value     = ""
+        sendButton.onclick   = null
+        inputField.onkeydown = null
+        inputField.disabled  = true
+        sendButton.disabled  = true
+        inputField.placeholder = "Please wait..."
+        onSubmit(msg)                            // hand off to backend
+      }
+
+      sendButton.onclick   = doSend
+      inputField.onkeydown = (e) => { if (e.key === "Enter") doSend() }
+    }
+
     const INTENT_HANDLERS = {
       POLICY_QUESTION:    handleGeneralIntent,
       GENERAL_QUERY:      handleGeneralIntent,
       ORDER_TRACKING:     handleOrderTracking,
       CUSTOMER_PROFILE:   handleCustomerProfile,
-      // ── new intents ────────────────────────────────────────────────────────
       ORDER_LISTING:      handleChatbotOrderList,
       DELIVERY_TRACKING:  handleDeliveryTrackingResponse,
       RETURN_STATUS:      handleReturnStatusResponse,
       WALLET_BALANCE:     handleWalletBalanceResponse,
+      STORE_LOCATOR:      handleStoreLocatorResponse,
+      GIFT_CARD_BALANCE:  handleGiftCardBalanceResponse,
+      WRITE_US:           handleWriteUs,
       DEFAULT:            handleDefaultIntent,
     }
 
     function handleGeneralIntent(payload) {
-      renderBotMessage(payload.chat_message || "No information found.")
+      renderBotMessage(payload.chat_message || payload.data || "No information found.")
+      enableInput("Ask another question...")
       renderBackToMenu()
     }
 
     function handleDefaultIntent(payload) {
       renderBotMessage(payload.chat_message || payload.data || "No response available.")
+      enableInput("Ask another question...")
       renderBackToMenu()
     }
 
+    /**
+     * STORE_LOCATOR intent — renders store cards from AI-routed free-text query.
+     * payload is already json.data (StoreList DTO), so wrap to match renderStoreCards expectation.
+     */
+    function handleStoreLocatorResponse(payload) {
+      const chatMsg = payload?.chatMessage || payload?.chat_message
+      if (chatMsg) {
+        renderBotMessage(chatMsg)
+        renderBackToMenu()
+        enableInput("Type your message...")
+        return
+      }
+      // renderStoreCards expects { data: { stores: [...] } }
+      if (!renderStoreCards({ data: payload })) {
+        renderBotMessage("😔 No nearby stores found. Try using the Store Locator menu button.")
+      }
+      renderBackToMenu()
+      enableInput("Type your message...")
+    }
+
+    /**
+     * GIFT_CARD_BALANCE intent — from AI-routed free-text query.
+     * If backend returned balance data → show it.
+     * Otherwise → trigger the gift card input flow to collect card number.
+     */
+    function handleGiftCardBalanceResponse(payload) {
+      const chatMsg = payload?.chatMessage || payload?.chat_message
+      // If backend has balance data ready, show it
+      if (payload?.amount?.formattedValue) {
+        const status = payload.active ? "✅ Active" : "❌ Inactive"
+        chatBody.innerHTML += `
+          <div class="bubble bot-bubble">
+            🎁 <b>Gift Card Balance</b><br>
+            Balance: <b>${payload.amount.formattedValue}</b><br>
+            Status: ${status}
+            ${payload.expiryDate ? `<br>Expires: ${payload.expiryDate}` : ""}
+          </div>`
+        chatBody.scrollTop = chatBody.scrollHeight
+        renderBackToMenu()
+        enableInput("Type your message...")
+        return
+      }
+      // No balance data — redirect to gift card input flow (manages its own input state)
+      if (chatMsg) renderBotMessage(chatMsg)
+      handleGiftCardBalance()
+    }
+
+    /**
+     * WRITE_US intent — renders the Write-to-Us support ticket form.
+     * Triggered by:
+     *   a) Backend WRITE_US intent (user typed "raise ticket", "write to us", etc.)
+     *   b) PolicyIntentHandler escalation when RAG finds 0 docs.
+     *   c) "Write to Us" menu button.
+     */
+    function handleWriteUs(payload) {
+      const introMsg = payload?.data || payload?.chat_message
+        || "I'll help you reach our support team. Fill in the form below — we'll get back to you within 24 hours. 😊"
+      renderBotMessage(introMsg)
+
+      const CATEGORIES = [
+        "Query", "Return", "Delivery Issue", "Late Delivery",
+        "Cancellation", "Refund", "Exchange", "Damaged Item", "Other"
+      ]
+
+      // Auto-fill from profile if logged in
+      const profileName  = session.profile?.name  || session.profile?.firstName || ""
+      const profileEmail = session.profile?.email || ""
+      const profilePhone = session.profile?.phone || session.profile?.mobileNumber || ""
+
+      const form = document.createElement("div")
+      form.className = "write-us-form"
+      form.innerHTML = `
+        <h4>✉️ Write to Us</h4>
+        <p>We'll respond within 24 hours</p>
+
+        <div class="write-us-field">
+          <label class="write-us-label">Category *</label>
+          <select class="write-us-select" id="wu-category">
+            <option value="">— Select category —</option>
+            ${CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join("")}
+          </select>
+        </div>
+
+        <div class="write-us-field">
+          <label class="write-us-label">Describe your issue *</label>
+          <textarea class="write-us-textarea" id="wu-message"
+            placeholder="Please describe your issue in detail..."></textarea>
+        </div>
+
+        <div class="write-us-field">
+          <label class="write-us-label">Name *</label>
+          <input class="write-us-input" id="wu-name" type="text"
+            placeholder="Your name" value="${profileName}">
+        </div>
+
+        <div class="write-us-field">
+          <label class="write-us-label">Email *</label>
+          <input class="write-us-input" id="wu-email" type="email"
+            placeholder="your@email.com" value="${profileEmail}">
+        </div>
+
+        <div class="write-us-field">
+          <label class="write-us-label">Phone</label>
+          <input class="write-us-input" id="wu-phone" type="tel"
+            placeholder="Mobile number (optional)" value="${profilePhone}">
+        </div>
+
+        <button class="write-us-submit" id="wu-submit">Submit Ticket</button>
+      `
+      chatBody.appendChild(form)
+      chatBody.scrollTop = chatBody.scrollHeight
+
+      // Submit handler
+      form.querySelector("#wu-submit").addEventListener("click", async () => {
+        const category = form.querySelector("#wu-category").value.trim()
+        const message  = form.querySelector("#wu-message").value.trim()
+        const name     = form.querySelector("#wu-name").value.trim()
+        const email    = form.querySelector("#wu-email").value.trim()
+        const phone    = form.querySelector("#wu-phone").value.trim()
+
+        if (!category) { renderBotMessage("⚠️ Please select a category."); return }
+        if (!message)  { renderBotMessage("⚠️ Please describe your issue."); return }
+        if (!name)     { renderBotMessage("⚠️ Please enter your name."); return }
+        if (!email)    { renderBotMessage("⚠️ Please enter your email."); return }
+
+        // Disable to prevent double-submit
+        const btn = form.querySelector("#wu-submit")
+        btn.disabled = true
+        btn.textContent = "Sending…"
+
+        const { data, error } = await api.submitTicket({ name, email, phone, category, message })
+
+        // Remove form from chat
+        form.remove()
+
+        if (error || !data?.success) {
+          renderBotMessage(data?.message || "😔 Unable to send right now. Please try again or call us.")
+        } else {
+          renderBotMessage(`✅ <b>Ticket raised!</b><br>Reference: <b>${data.ticketId}</b><br>We'll get back to you within 24 hours.`)
+        }
+        renderBackToMenu()
+      })
+    }
+
+
     function handleOrderTracking(payload) {
       if (checkAndTriggerLogin(payload, "Please login to check your order details.")) return
+
+      // AI returned a message but no real data → needs order number from user
+      if (payload.chat_message && payload.chat_message.trim() !== "" && !Array.isArray(payload.orderDetailsList)) {
+        renderBotMessage(payload.chat_message)
+        openOrderInput("Enter your order number...", (msg) => sendMessage(null, msg))
+        return
+      }
+
       if (payload.chat_message && payload.chat_message.trim() !== "") {
         renderBotMessage(payload.chat_message)
       } else {
@@ -1115,6 +1444,7 @@
         }
       }
       renderBackToMenu()
+      enableInput("Type your message...")
     }
 
     function handleCustomerProfile(payload) {
@@ -1124,6 +1454,7 @@
       if (chatMsg !== "") {
         renderBotMessage(chatMsg)
         renderBackToMenu()
+        enableInput("Type your message...")
         return
       }
 
@@ -1132,6 +1463,7 @@
       if (!p) {
         renderBotMessage("Profile not available. Please try again.")
         renderBackToMenu()
+        enableInput("Type your message...")
         return
       }
 
@@ -1160,6 +1492,7 @@
       chatBody.appendChild(card)
       chatBody.scrollTop = chatBody.scrollHeight
       renderBackToMenu()
+      enableInput("Type your message...")
     }
 
     function checkAndTriggerLogin(payload, defaultMsg = "Please login to continue.") {
@@ -1271,6 +1604,7 @@
       if (error || !json) {
         renderBotMessage("⚠️ Something went wrong. Please try again.")
         renderBackToMenu()
+        enableInput("Type your message...")
         return
       }
       console.log("🧠 Chatbot Response:", json)
@@ -1282,7 +1616,7 @@
 
     async function showGreeting() {
       clearBody()
-      inputContainer.classList.remove("active")
+      enableInput("Type your message...")
 
       let userName = null
 
@@ -1384,6 +1718,104 @@
       chatBody.appendChild(sbtn)
     }
 
+    // ─── Topic Intercept (text-input only) ──────────────────────────────────
+    // When a user types a vague topic keyword (e.g. "gift card", "my orders"),
+    // we render the relevant submenu buttons inline WITHOUT calling the API.
+    // Rules:
+    //   - Message has 7+ digit sequence → order no or GC no → skip intercept
+    //   - Message has > 6 words          → full question → skip intercept
+    //   - Otherwise → check pattern → render submenu inline if match
+
+    const TOPIC_INTERCEPT = [
+      {
+        pattern: /\b(gift\s*card|giftcard|gift\s*voucher|voucher|\bgc\b|card\s*balance|e[\s-]?gift)\b/i,
+        label:   "Here are your Gift Card options:",
+        subs: [
+          { title: "Check Balance", intentKey: "GIFT_CARD_BALANCE", icon: "💳" },
+        ],
+      },
+      {
+        pattern: /\b(my\s*orders?|order\s*history|past\s*orders?|previous\s*orders?|purchases?|bought|shopping\s*history|all\s*orders?)\b/i,
+        label:   "Here are your Order options:",
+        subs: [
+          { title: "Order History",   intentKey: "ORDER_LISTING",      icon: "📋" },
+          { title: "Track My Order",  intentKey: "TRACK_ORDER",        icon: "📦" },
+          { title: "Delivery Status", intentKey: "DELIVERY_TRACKING",  icon: "🚚" },
+          { title: "Return / Refund", intentKey: "RETURN_STATUS",      icon: "↩️" },
+        ],
+      },
+      {
+        pattern: /\b(track|tracking|shipment|shipped|dispatch(ed)?|out\s*for\s*delivery|delivery\s*status|delivery\s*update)\b/i,
+        label:   "Track your delivery:",
+        subs: [
+          { title: "Track My Order",  intentKey: "TRACK_ORDER",       icon: "📦" },
+          { title: "Delivery Status", intentKey: "DELIVERY_TRACKING", icon: "🚚" },
+        ],
+      },
+      {
+        pattern: /\b(return|refund|exchange|cancel(lation)?|replace(ment)?|damaged|wrong\s*item|missing\s*item|money\s*back)\b/i,
+        label:   "Return & Refund options:",
+        subs: [
+          { title: "Return / Refund", intentKey: "RETURN_STATUS", icon: "↩️" },
+        ],
+      },
+      {
+        pattern: /\b(store|stores|near\s*me|nearest\s*store|find\s*store|store\s*location|branch|outlet|shop\s*near|locate\s*store)\b/i,
+        label:   "Find a store near you:",
+        subs: [
+          { title: "Nearby Stores", intentKey: "NEARBY_STORE", icon: "📍" },
+        ],
+      },
+      {
+        pattern: /\b(wallet|points|cashback|rewards?|loyalty|lmg\s*points|earned\s*points|my\s*points|my\s*wallet)\b/i,
+        label:   "Your Wallet:",
+        subs: [
+          { title: "My Wallet", intentKey: "WALLET_BALANCE", icon: "👛" },
+        ],
+      },
+      {
+        pattern: /\b(my\s*profile|my\s*account|profile|account|personal\s*details?|my\s*info|account\s*details?)\b/i,
+        label:   "Account options:",
+        subs: [
+          { title: "My Profile", intentKey: "CUSTOMER_PROFILE", icon: "👤" },
+          { title: "My Wallet",  intentKey: "WALLET_BALANCE",   icon: "👛" },
+        ],
+      },
+    ]
+
+    /**
+     * Returns a matching TOPIC_INTERCEPT entry for vague/broad messages,
+     * or null if the message should be sent to the API directly.
+     */
+    /**
+     * Option C — intercept ONLY short (1–2 word) exact navigation phrases.
+     * Anything longer or with digits goes straight to the AI via sendMessage().
+     * The AI intent result then drives the widget rendering via INTENT_HANDLERS.
+     */
+    function tryTopicIntercept(message) {
+      const clean = message.trim()
+      if (/\d/.test(clean)) return null                    // contains any digit → skip
+      if (clean.split(/\s+/).length > 2) return null       // 3+ words → let AI decide
+      return TOPIC_INTERCEPT.find(t => t.pattern.test(clean)) || null
+    }
+
+    /**
+     * Handles free-text input from the chat input box.
+     * Topic intercept is applied first; if matched the relevant submenu
+     * buttons are rendered inline without any API call.
+     * Falls through to sendMessage() for all other input.
+     */
+    function handleFreeTextSend(msg) {
+      const intercept = tryTopicIntercept(msg)
+      if (intercept) {
+        renderBotMessage(intercept.label)
+        intercept.subs.forEach(sub => renderSubmenuButton(sub))
+        renderBackToMenu()
+        return
+      }
+      sendMessage(null, msg)
+    }
+
     /**
      * intentKey dispatch map.
      *
@@ -1419,16 +1851,28 @@
       if (handler) {
         await handler()
       } else {
-        // Unknown intentKey → free-text input fallback
+        // Unknown intentKey → free-text input fallback with topic intercept
         renderBotMessage(`Please enter your question related to <b>${sub.title}</b>.`)
-        inputContainer.classList.add("active")
-        sendButton.onclick = () => {
+        enableInput(`Ask about ${sub.title}...`)
+
+        // Reset before assigning to prevent duplicate handlers
+        sendButton.onclick    = null
+        inputField.onkeydown  = null
+
+        const doSend = () => {
           const msg = inputField.value.trim()
           if (!msg) return
           renderUserMessage(msg)
-          sendMessage(null, msg)
-          inputField.value = ""
+          inputField.value     = ""
+          sendButton.onclick   = null
+          inputField.onkeydown = null
+          inputField.disabled  = true
+          sendButton.disabled  = true
+          inputField.placeholder = "Please wait..."
+          handleFreeTextSend(msg)
         }
+        sendButton.onclick   = doSend
+        inputField.onkeydown = (e) => { if (e.key === "Enter") doSend() }
       }
       renderBackToMenu()
     }
@@ -1446,39 +1890,14 @@
         return
       }
 
-      renderBotMessage(
-        "📦 Please enter your <b>Order Number</b> to check its status.<br>" +
-        "<small style='color:#888;'>Order numbers are numeric, e.g. <i>9419396447</i></small>"
-      )
+      renderBotMessage("📦 Please enter your <b>Order Number</b> to check its status.")
 
-      inputContainer.classList.add("active")
-      inputField.placeholder = "Enter order number (digits only)..."
-      inputField.inputMode   = "numeric"
-      inputField.focus()
-
-      const handleSubmit = async () => {
-        const raw = inputField.value.trim()
-
-        // Validate: must be 7–12 digits only
-        if (!/^\d{7,12}$/.test(raw)) {
-          renderBotMessage("⚠️ That doesn't look like a valid order number. Please enter a numeric order number (e.g. 9419396447).")
-          inputField.value = ""
-          inputField.focus()
-          return
-        }
-
-        renderUserMessage(raw)
-        inputField.value          = ""
-        inputField.inputMode      = ""
-        inputField.placeholder    = "Type a message..."
-        inputContainer.classList.remove("active")
-        sendButton.onclick        = null   // detach this handler
-
-        showLoader("Looking up order #" + raw + "…")
+      openOrderInput("Enter your order number...", async (raw) => {
+        showLoader("Looking up your order…")
         const { data: json, error } = await api._post(
           "/chat",
           { ...api._context(), message: "Track order " + raw, orderNo: raw },
-          null   // loader already shown above
+          null
         )
         hideLoader()
 
@@ -1490,13 +1909,7 @@
 
         const payload = typeof json.data === "string" ? { chat_message: json.data } : json.data || json
         handleOrderTracking(payload)
-      }
-
-      // Wire submit to both the Send button and Enter key
-      sendButton.onclick = handleSubmit
-      inputField.onkeydown = (e) => {
-        if (e.key === "Enter") handleSubmit()
-      }
+      })
     }
     
 
@@ -1689,23 +2102,8 @@
 
     /** Called when user taps "🚚 Delivery Status" submenu button. */
     async function handleDeliveryTrackingMenu() {
-      renderBotMessage(
-        "🚚 Please enter your <b>Order Number</b> (and optionally the item/entry number) " +
-        "to check your delivery status. Example: <i>\"LS12345678 entry 1\"</i>"
-      )
-      inputContainer.classList.add("active")
-      inputField.placeholder = "Enter order number..."
-      inputField.focus()
-
-      sendButton.onclick = () => {
-        const msg = inputField.value.trim()
-        if (!msg) return
-        renderUserMessage(msg)
-        inputField.value = ""
-        inputContainer.classList.remove("active")
-        inputField.placeholder = "Type a message..."
-        sendMessage(null, msg)   // AI extracts params and calls DeliveryTrackingTool
-      }
+      renderBotMessage("🚚 Please enter your <b>Order Number</b> to check your delivery status. Example: <i>LS12345678</i>")
+      openOrderInput("Enter your order number...", (msg) => sendMessage(null, msg))
     }
 
     /**
@@ -1715,9 +2113,10 @@
     function handleDeliveryTrackingResponse(payload) {
       if (checkAndTriggerLogin(payload, "Please sign in to check your delivery status.")) return
 
+      // AI returned a message but no real data → needs order number from user
       if (payload.chatMessage && payload.chatMessage.trim() !== "") {
         renderBotMessage(payload.chatMessage)
-        renderBackToMenu()
+        openOrderInput("Enter your order number...", (msg) => sendMessage(null, msg))
         return
       }
 
@@ -1758,22 +2157,10 @@
     /** Called when user taps "↩️ Return / Refund" submenu button. */
     async function handleReturnStatusMenu() {
       renderBotMessage(
-        "↩️ Please enter your <b>Order Number</b> or <b>RMA Number</b> to check your return / refund status. " +
-        "Example: <i>\"order LS12345678\"</i> or <i>\"RMA 99001\"</i>"
+        "↩️ Please enter your <b>Order Number</b> to check your return / refund status. " +
+        "Example: <i>LS12345678</i>"
       )
-      inputContainer.classList.add("active")
-      inputField.placeholder = "Enter order or RMA number..."
-      inputField.focus()
-
-      sendButton.onclick = () => {
-        const msg = inputField.value.trim()
-        if (!msg) return
-        renderUserMessage(msg)
-        inputField.value = ""
-        inputContainer.classList.remove("active")
-        inputField.placeholder = "Type a message..."
-        sendMessage(null, msg)   // AI extracts orderNo + rmaNo and calls ReturnStatusTool
-      }
+      openOrderInput("Enter your order number...", (msg) => sendMessage(null, msg))
     }
 
     /**
@@ -1784,9 +2171,10 @@
     function handleReturnStatusResponse(payload) {
       if (checkAndTriggerLogin(payload, "Please sign in to check your return status.")) return
 
+      // AI returned a message but no real data → needs order number from user
       if (payload.chatMessage && payload.chatMessage.trim() !== "") {
         renderBotMessage(payload.chatMessage)
-        renderBackToMenu()
+        openOrderInput("Enter your order number...", (msg) => sendMessage(null, msg))
         return
       }
 
@@ -1837,6 +2225,7 @@
       if (payload.chatMessage && payload.chatMessage.trim() !== "") {
         renderBotMessage(payload.chatMessage)
         renderBackToMenu()
+        enableInput("Type your message...")
         return
       }
 
@@ -1863,6 +2252,7 @@
         </div>`
       chatBody.scrollTop = chatBody.scrollHeight
       renderBackToMenu()
+      enableInput("Type your message...")
     }
 
     // ─────────────────────────────────────────────────────────────────────────

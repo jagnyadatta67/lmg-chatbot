@@ -53,8 +53,8 @@ public class IntentRouterService {
         log.info("📨 Processing query: {}", query);
 
         try {
-            // Step 1: Try pattern-based routing first (fast path)
-            IntentHandler<?> handler =  null ;//findHandlerByPattern(query);
+            // Step 1: Try pattern-based routing first (fast path — no AI token cost)
+            IntentHandler<?> handler = findHandlerByPattern(query);
 
             // Step 2: If no pattern match, use AI classifier
             if (handler == null) {

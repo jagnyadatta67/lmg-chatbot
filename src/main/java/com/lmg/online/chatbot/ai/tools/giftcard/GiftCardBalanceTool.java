@@ -11,7 +11,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -79,9 +82,24 @@ public class GiftCardBalanceTool {
                 return errorResponse(concept, "No response received from server.");
             }
 
+
             log.info("✅ [GiftCardBalanceTool] errorOccurred={}, active={}, amount={}",
                     response.isErrorOccurred(), response.isActive(),
                     response.getAmount() != null ? response.getAmount().getFormattedValue() : "null");
+            if(!CollectionUtils.isEmpty(response.getErrors()) && "lmg.giftcard.client.server.error".equalsIgnoreCase(response.getErrors().get(1).getReason())){
+
+                log.info("✅ [GiftCardBalanceTool] Retry errorOccurred={}, active={}, amount={}",
+                        response.isErrorOccurred(), response.isActive(),
+                        response.getAmount() != null ? response.getAmount().getFormattedValue() : "null");
+                 response = authenticationServiceUtil
+                        .callWithAuthRetry(appId, url, HttpMethod.POST, headers, body,
+                                GiftCardBalanceResponse.class, env)
+                        .getBody();
+                log.info("✅ [GiftCardBalanceTool] Retry Success errorOccurred={}, active={}, amount={}",
+                        response.isErrorOccurred(), response.isActive(),
+                        response.getAmount() != null ? response.getAmount().getFormattedValue() : "null");
+
+            }
 
             return response;
 

@@ -1,15 +1,25 @@
 package com.lmg.online.chatbot.ai.project.doc.vector.config.chroma;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.ai.embedding.TokenCountBatchingStrategy;
-import org.springframework.ai.vectorstore.redis.RedisVectorStore;
-import org.springframework.ai.vectorstore.redis.RedisVectorStore.MetadataField;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import redis.clients.jedis.JedisPooled;
 
+/**
+ * Redis infrastructure configuration.
+ *
+ * Exposes a single JedisPooled bean used by:
+ *  - VectorStoreFactoryRedis   (multi-tenant vector store creation)
+ *  - MultiTenantVectorServiceRedis (index management / document deletion)
+ *  - MultiTenantPdfService     (key scanning for document listing)
+ *
+ * Connection properties are read from application.properties:
+ *   spring.data.redis.host     (env: REDIS_HOST)
+ *   spring.data.redis.port     (env: REDIS_PORT, default 6379)
+ *   spring.data.redis.username (env: REDIS_USERNAME, default "default")
+ *   spring.data.redis.password (env: REDIS_PASSWORD)
+ */
 @Configuration
 @Slf4j
 public class MultiTenantVectorStoreConfigRedis {
@@ -20,79 +30,40 @@ public class MultiTenantVectorStoreConfigRedis {
     @Value("${spring.data.redis.port:6379}")
     private int redisPort;
 
+    @Value("${spring.data.redis.username:default}")
+    private String redisUsername;
+
     @Value("${spring.data.redis.password:}")
     private String redisPassword;
 
-    @Value("${spring.ai.vectorstore.redis.initialize-schema:true}")
-    private boolean initializeSchema;
-
-    @Value("${spring.ai.vectorstore.redis.index-name:chatbot-documents-idx}")
-    private String defaultIndexName;
-
-    @Value("${spring.ai.vectorstore.redis.prefix:chatbot:doc:}")
-    private String defaultPrefix;
-
-    /**
-     * Create JedisPooled Bean (Redis connection)
-     */
     @Bean
     public JedisPooled jedisPooled() {
-        log.info("🔗 Creating Redis connection");
-        log.info("   Host: {}:{}", redisHost, redisPort);
+        log.info("🔗 Creating Redis connection → {}:{}", redisHost, redisPort);
+
+        boolean hasPassword = redisPassword != null && !redisPassword.trim().isEmpty();
+        boolean hasUsername = redisUsername != null
+                && !redisUsername.trim().isEmpty()
+                && !"default".equals(redisUsername.trim());
 
         JedisPooled jedis;
-
-        if (redisPassword != null && !redisPassword.trim().isEmpty()) {
-            log.info("🔐 Using password authentication");
-            jedis = new JedisPooled(redisHost, redisPort, null, redisPassword);
+        if (hasPassword && hasUsername) {
+            log.info("🔐 Redis: username + password auth (user={})", redisUsername);
+            jedis = new JedisPooled(redisHost, redisPort, redisUsername, redisPassword);
+        } else if (hasPassword) {
+            log.info("🔐 Redis: password-only auth");
+            jedis = new JedisPooled(redisHost, redisPort, "default", redisPassword);
         } else {
-            log.info("🔓 No password configured");
+            log.info("🔓 Redis: no auth");
             jedis = new JedisPooled(redisHost, redisPort);
         }
 
-        // Test connection
         try {
             String pong = jedis.ping();
-            log.info("✅ Redis connection successful: {}", pong);
+            log.info("✅ Redis connection OK: {}", pong);
         } catch (Exception e) {
             log.error("❌ Redis connection failed: {}", e.getMessage());
         }
 
         return jedis;
-    }
-
-    /**
-     * Shared default vector store (optional fallback)
-     */
-    @Bean
-    public RedisVectorStore redisVectorStore(
-            JedisPooled jedisPooled,
-            EmbeddingModel embeddingModel) {
-
-        log.info("🔗 Creating default Redis vector store");
-        log.info("   Index: {}", defaultIndexName);
-        log.info("   Prefix: {}", defaultPrefix);
-
-        return RedisVectorStore.builder(jedisPooled, embeddingModel)
-                .indexName(defaultIndexName)
-                .prefix(defaultPrefix)
-                .initializeSchema(initializeSchema)
-                .metadataFields(
-                        MetadataField.tag("concept"),
-                        MetadataField.tag("category"),
-                        MetadataField.tag("source"),
-                        MetadataField.numeric("uploadDate")
-                )
-                .batchingStrategy(new TokenCountBatchingStrategy())
-                .build();
-    }
-
-    /**
-     * Initialize all concepts on application startup
-     */
-    @Bean
-    public String initializeVectorStoresRedis(VectorStoreFactoryRedis vectorStoreFactory) {
-        vectorStoreFactory.initializeAllConcepts();
-        return "Vector stores initialized";
     }
 }

@@ -33,12 +33,21 @@ public class ConceptBaseUrlResolver {
     );
 
 
+    /**
+     * Returns just the raw phone number for a concept.
+     * e.g. "1800-123-1555"
+     */
+    public static String getRawPhoneNumber(String concept) {
+        String normalized = concept == null ? "" : concept.trim().toUpperCase();
+        return conceptContactMap.getOrDefault(normalized, "1800-123-1555");
+    }
+
+    /**
+     * Returns a customer support line sentence.
+     * e.g. "For assistance, please call our customer support at 1800-123-1555."
+     */
     public static String getPhoneNumber(String concept) {
-
-        String phoneNumber=conceptContactMap.get(concept);
-
-        return "If unclear,: 'Call"+ phoneNumber+" for details.";
-
+        return "For assistance, please call our customer support at " + getRawPhoneNumber(concept) + ".";
     }
 
     // === PUBLIC ENTRY METHODS ===

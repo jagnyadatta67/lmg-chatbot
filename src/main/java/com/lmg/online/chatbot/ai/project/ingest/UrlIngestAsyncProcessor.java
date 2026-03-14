@@ -1,5 +1,7 @@
 package com.lmg.online.chatbot.ai.project.ingest;
 
+
+
 import com.lmg.online.chatbot.ai.project.doc.vector.config.chroma.VectorStoreFactoryRedis;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

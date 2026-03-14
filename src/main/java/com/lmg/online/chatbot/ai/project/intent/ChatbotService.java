@@ -66,8 +66,8 @@ public class ChatbotService {
 
             log.info("❌ Cache miss for query: {}", query);
 
-            // Step 1: Try pattern-based routing first (fast path)
-            IntentHandler<?> handler = null;
+            // Step 1: Try pattern-based routing first (fast path — no AI token cost)
+            IntentHandler<?> handler = findHandlerByPattern(query);
 
             // Step 2: If no pattern match, use AI classifier (with caching)
             if (handler == null) {
@@ -93,6 +93,17 @@ public class ChatbotService {
             log.error("❌ Error processing query: {}", query, e);
             return handleError(request, startTime, e);
         }
+    }
+
+    /**
+     * Fast-path: check if any handler's canHandle() regex matches the query.
+     * Avoids an AI classifier call for obvious intents (saves tokens + latency).
+     */
+    private IntentHandler<?> findHandlerByPattern(String query) {
+        return intentHandlers.values().stream()
+                .filter(h -> h.canHandle(query))
+                .findFirst()
+                .orElse(null);
     }
 
     /**
@@ -211,6 +222,7 @@ public class ChatbotService {
         }
         response.getMetadata().put("cached", fromCache);
         response.getMetadata().put("processingTimeMs", processingTime);
+        response.setSuccess(true);
 
         log.info("⏱️ Total processing time: {}ms (cached: {})", processingTime, fromCache);
 

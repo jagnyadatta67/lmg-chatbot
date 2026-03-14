@@ -5,6 +5,8 @@ import com.lmg.online.chatbot.ai.analytics.ChatbotResponse;
 import com.lmg.online.chatbot.ai.analytics.TokenCostCalculator;
 import com.lmg.online.chatbot.ai.analytics.TokenUsage;
 import com.lmg.online.chatbot.ai.common.ConceptBaseUrlResolver;
+
+
 import com.lmg.online.chatbot.ai.project.doc.vector.config.chroma.VectorStoreFactoryRedis;
 import com.lmg.online.chatbot.ai.project.handler.IntentHandler;
 import com.lmg.online.chatbot.ai.request.ChatRequest;
@@ -63,7 +65,28 @@ public class PolicyIntentHandler implements IntentHandler<String> {
     @Override
     public ChatbotResponse<String> handle(ChatRequest req, long startTime) {
         log.info("📋 POLICY_QUESTION for concept={}", req.getConcept());
-        ChatResponse response = handlePolicyQuestion(req);
+
+        // 1. Fetch RAG docs first — if none found, escalate to Write-to-Us
+        VectorStore vectorStore = vectorStoreFactory.getVectorStore(req.getConcept());
+        List<Document> docs = vectorStore.similaritySearch(
+                SearchRequest.builder()
+                        .query(req.getMessage())
+                        .topK(SIMILARITY_TOP_K)
+                        .build()
+        );
+        log.info("📚 Found {} relevant policy chunks for concept={}", docs.size(), req.getConcept());
+
+        if (docs.isEmpty()) {
+            log.info("📭 No RAG context — escalating to WRITE_US for concept={}", req.getConcept());
+            return ChatbotResponse.<String>builder()
+                    .data("I'm sorry, I couldn't find specific information on that. Would you like to raise a support ticket and our team will get back to you?")
+                    .intent("WRITE_US")
+                    .responseTimeMs(System.currentTimeMillis() - startTime)
+                    .build();
+        }
+
+        // 2. RAG docs found — call AI with context
+        ChatResponse response = callWithDocs(req, docs);
         return buildResponse(response, req, startTime);
     }
 
@@ -77,56 +100,100 @@ public class PolicyIntentHandler implements IntentHandler<String> {
         return POLICY_QUESTION_PATTERN.matcher(query.toLowerCase()).matches();
     }
 
-    // ── RAG core (inlined from deleted MultiTenantSmartChatService) ──────────
+    // ── RAG AI call (only invoked when docs are non-empty) ───────────────────
 
-    private ChatResponse handlePolicyQuestion(ChatRequest req) {
-        String concept  = req.getConcept();
-        String question = req.getMessage();
+    private ChatResponse callWithDocs(ChatRequest req, List<Document> docs) {
+        String systemPrompt = buildSystemPrompt(req.getConcept());
+        String userPrompt   = buildUserPrompt(req.getMessage(), docs, req.getPreviousResponse());
 
-        // 1. Get concept-specific Redis vector store
-        VectorStore vectorStore = vectorStoreFactory.getVectorStore(concept);
-
-        // 2. Retrieve most-relevant policy chunks
-        List<Document> docs = vectorStore.similaritySearch(
-                SearchRequest.builder()
-                        .query(question)
-                        .topK(SIMILARITY_TOP_K)
-                        .build()
-        );
-        log.info("📚 Found {} relevant policy chunks for concept={}", docs.size(), concept);
-
-        // 3. Build grounded prompt and call the policy LLM
-        String prompt = buildRagPrompt(concept, question, docs);
         return policyClient.prompt()
-                .user(prompt)
+                .system(systemPrompt)
+                .user(userPrompt)
                 .call()
                 .chatResponse();
     }
 
-    private String buildRagPrompt(String concept, String question, List<Document> docs) {
-        String context = docs.isEmpty()
-                ? "No specific policy documents found."
-                : docs.stream()
-                      .map(Document::getText)
-                      .collect(Collectors.joining("\n\n---\n\n"));
-
-        String contactLine = ConceptBaseUrlResolver.getPhoneNumber(concept);
+    /**
+     * System prompt — defines the assistant persona and strict response rules.
+     * Sent once as the "system" role; not repeated in the user turn.
+     */
+    private String buildSystemPrompt(String concept) {
+        String brand = concept != null ? concept.trim() : "Landmark Group";
+        String phone = ConceptBaseUrlResolver.getRawPhoneNumber(brand);
 
         return String.format("""
-                You are a helpful customer support agent for %s.
-                Use ONLY the policy information provided below to answer the question.
-                If the answer is not in the provided context, say you don't have that information
-                and provide the support contact: %s
+                You are a friendly Policy & FAQ assistant for %s (Landmark Group India).
+                Help customers understand policies and procedures clearly.
 
-                === POLICY CONTEXT ===
-                %s
-                =====================
+                === FORMATTING RULES (MANDATORY) ===
+                - NEVER write long paragraphs or big statements
+                - ALWAYS use short bullet points (• ) or numbered steps (1. 2. 3.)
+                - Each point must be ONE short sentence — max 12 words per point
+                - Start with a one-line direct answer, then list the points
+                - Always end with: "📞 For help, call us at %s."
 
-                Customer question: %s
+                === RESPONSE RULES ===
 
-                Answer helpfully and concisely based on the policy context above.
+                RULE 1 — PROCESS QUESTIONS (how to return / cancel / exchange / track):
+                Use numbered steps. Example format:
+                  Here's how you can [action]:
+                  1. [Step one]
+                  2. [Step two]
+                  3. [Step three]
+                  📞 For help, call us at %s.
+
+                RULE 2 — POLICY QUESTIONS (timelines / charges / eligibility / conditions):
+                Use bullet points. Example format:
+                  Here's what you need to know:
+                  • [Point one]
+                  • [Point two]
+                  • [Point three]
+                  📞 For help, call us at %s.
+
+                RULE 3 — NO CONTEXT / NOT FOUND:
+                Reply:
+                  I'm sorry, I don't have that information right now.
+                  📞 For accurate details, call us at %s.
+
+                RULE 4 — COMPLAINTS / DAMAGED ITEMS:
+                Reply empathetically:
+                  I'm sorry to hear about this! 😔
+                  📞 Please call our support team at %s for urgent help.
+
+                === STRICT PROHIBITIONS ===
+                - Never write paragraphs — only bullets or numbered lists
+                - Never make up any policy detail, amount, or date
+                - Never say "based on my training data" or "as an AI"
                 """,
-                concept, contactLine, context, question);
+                brand, phone, phone, phone, phone, phone);
+    }
+
+    /**
+     * User prompt — contains the retrieved RAG context and the customer's question.
+     * Lean and structured so the LLM knows exactly what is grounded vs. unknown.
+     */
+    private String buildUserPrompt(String question, List<Document> docs, String previousResponse) {
+        String context = docs.isEmpty()
+                ? "[No matching policy documents found in knowledge base]"
+                : docs.stream()
+                      .map(d -> "• " + d.getText().trim())
+                      .collect(Collectors.joining("\n\n"));
+
+        StringBuilder sb = new StringBuilder();
+
+        if (previousResponse != null && !previousResponse.isBlank()) {
+            sb.append("=== PREVIOUS ASSISTANT REPLY ===\n")
+              .append(previousResponse.trim())
+              .append("\n\n");
+        }
+
+        sb.append("=== RETRIEVED POLICY CONTEXT ===\n")
+          .append(context)
+          .append("\n\n")
+          .append("=== CUSTOMER QUESTION ===\n")
+          .append(question.trim());
+
+        return sb.toString();
     }
 
 
@@ -156,8 +223,8 @@ public class PolicyIntentHandler implements IntentHandler<String> {
                 getIntentType(),
                 request.getMessage(),
                 response.getResult().getOutput().getText(),
-                usage.getPromptTokens().intValue(),
-                usage.getCompletionTokens().intValue(),
+                usage != null ? usage.getPromptTokens().intValue()     : 0,
+                usage != null ? usage.getCompletionTokens().intValue() : 0,
                 response.getMetadata().getModel(),
                 response.getResult().getMetadata().getFinishReason(),
                 true,
@@ -165,8 +232,12 @@ public class PolicyIntentHandler implements IntentHandler<String> {
                 responseTime
         );
 
-        log.info("📊 {} - Tokens: {} (↑{} ↓{}), Time: {}ms",
-                getIntentType(), usage.getTotalTokens(), usage.getPromptTokens(),
-                usage.getCompletionTokens(), responseTime);
+        if (usage != null) {
+            log.info("📊 {} - Tokens: {} (↑{} ↓{}), Time: {}ms",
+                    getIntentType(), usage.getTotalTokens(), usage.getPromptTokens(),
+                    usage.getCompletionTokens(), responseTime);
+        } else {
+            log.info("📊 {} - Time: {}ms", getIntentType(), responseTime);
+        }
     }
 }
