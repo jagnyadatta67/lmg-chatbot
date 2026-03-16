@@ -1,21 +1,53 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Chat Widget Test</title>
-
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chatbot Widget Test Hub</title>
+  <style>
+    body { font-family: sans-serif; padding: 32px; background: #f5f5f5; }
+    h1   { margin-bottom: 24px; }
+    .grid { display: flex; gap: 20px; flex-wrap: wrap; }
+    .card {
+      background: white; border-radius: 12px; padding: 28px 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08); text-align: center;
+      text-decoration: none; color: inherit; min-width: 180px;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.14); }
+    .card .emoji { font-size: 36px; margin-bottom: 10px; }
+    .card h2    { font-size: 18px; margin-bottom: 4px; }
+    .card span  { font-size: 12px; color: #888; }
+  </style>
 </head>
 <body>
-<h1>Chat Widget Test</h1>
+  <h1>🤖 Chatbot Widget Test Hub</h1>
+  <div class="grid">
 
-<script src="http://localhost:8080/widget/chatbot-widget-res.js?v=92111"
-        data-backend="http://localhost:8080/api/chat" data-appid="Desktop"
-        data-userid="tBgd8PKlHa8u7He/UkVfRdX71O1ym6w8Xu1J8gJIsvFMNwYLL2jjEA=="  data-concept="MAX" data-env="uat1"
-        X-API-Key="lmg-0b9e204b67246750c9ccd5d285ebceffc60a2b5b8052af77b33600fce121c5c4" ></script>
+    <a class="card" href="/test-max.html" target="_blank">
+      <div class="emoji">👗</div>
+      <h2>MAX</h2>
+      <span>data-concept="MAX"</span>
+    </a>
 
+    <a class="card" href="/test-lifestyle.html" target="_blank">
+      <div class="emoji">🛍️</div>
+      <h2>LIFESTYLE</h2>
+      <span>data-concept="LIFESTYLE"</span>
+    </a>
 
+    <a class="card" href="/test-babyshop.html" target="_blank">
+      <div class="emoji">🍼</div>
+      <h2>BABYSHOP</h2>
+      <span>data-concept="BABYSHOP"</span>
+    </a>
 
+    <a class="card" href="/test-homecentre.html" target="_blank">
+      <div class="emoji">🏠</div>
+      <h2>HOMECENTRE</h2>
+      <span>data-concept="HOMECENTRE"</span>
+    </a>
+
+  </div>
 </body>
-
 </html>
