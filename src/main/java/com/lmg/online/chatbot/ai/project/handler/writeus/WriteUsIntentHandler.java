@@ -25,10 +25,40 @@ import java.util.regex.Pattern;
 public class WriteUsIntentHandler implements IntentHandler<String> {
 
     private static final Pattern WRITE_US_PATTERN = Pattern.compile(
-            ".*\\b(write\\s*to\\s*us|contact\\s*support|raise\\s*(a\\s*)?ticket|" +
-            "lodge\\s*(a\\s*)?complaint|send\\s*(a\\s*)?message|" +
+            ".*\\b(" +
+            // Direct contact / ticket requests (explicit action words — safe)
+            "write\\s*to\\s*us|contact\\s*support|raise\\s*(a\\s*)?ticket|" +
+            "lodge\\s*(a\\s*)?complaint|file\\s*(a\\s*)?complaint|" +
+            "submit\\s*(a\\s*)?complaint|register\\s*(a\\s*)?complaint|" +
+            // Human agent requests (unambiguous — user wants a human)
             "speak\\s*to\\s*(an?\\s*)?agent|talk\\s*to\\s*(a\\s*)?human|" +
-            "need\\s*help\\s*from\\s*(a\\s*)?person|escalate|complaint)\\b.*",
+            "talk\\s*to\\s*(an?\\s*)?agent|connect\\s*(me\\s*)?(to\\s*)?(an?\\s*)?agent|" +
+            "need\\s*help\\s*from\\s*(a\\s*)?person|real\\s*person|live\\s*agent|" +
+            "human\\s*support|speak\\s*to\\s*(a\\s*)?person|" +
+            // Escalation signals (explicit escalation — not policy curiosity)
+            "escalate|escalation|this\\s*is\\s*(not\\s*)?acceptable|" +
+            // Emotional frustration phrases (requires emotion word — avoids generic "not working")
+            "i\\s*(am|'m)\\s*(very\\s*)?(angry|frustrated|upset|annoyed|disappointed|furious)|" +
+            "so\\s*(angry|frustrated|upset|annoyed|fed\\s*up)|" +
+            "extremely\\s*(frustrated|unhappy|disappointed|angry)|" +
+            "this\\s*is\\s*(ridiculous|pathetic|terrible|awful|horrible|disgusting)|" +
+            "worst\\s*(service|experience|support|app|website)\\s*(ever|i've|i have)?|" +
+            "very\\s*unhappy|not\\s*happy\\s*at\\s*all|fed\\s*up|sick\\s*and\\s*tired|" +
+            // Unresolved issue phrases (requires "still" / "days" context — not standalone)
+            "still\\s*(not\\s*)?(resolved|fixed|delivered|returned|refunded|credited)|" +
+            "no\\s*response\\s*(from\\s*(support|team|you))|" +
+            "no\\s*one\\s*(is\\s*)?(helping|helped|responded|responding)|" +
+            "keep\\s*(waiting|getting\\s*ignored)|waited\\s*(so\\s*)?long|" +
+            "been\\s*waiting\\s*(for\\s*)?(days|weeks|hours)|" +
+            // Money-specific frustration (requires personal "my" context)
+            "where\\s*is\\s*my\\s*(refund|money|cashback)|" +
+            "my\\s*money\\s*(not\\s*)?(credited|received|refunded|returned)|" +
+            "give\\s*(me\\s*)?my\\s*(money|refund)\\s*back|want\\s*(a\\s*)?refund\\s*now|" +
+            // Serious trust violations (high-signal words — never policy)
+            "fraud|cheated|scam|mislead(ing)?|false\\s*(promise|information|advertisement)|" +
+            // Formal complaint nouns (safe standalone — not policy language)
+            "complaint|grievance" +
+            ")\\b.*",
             Pattern.CASE_INSENSITIVE
     );
 

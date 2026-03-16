@@ -1431,7 +1431,8 @@
 
       card.querySelector("#gate-login-btn").addEventListener("click", () => {
         // Collapse widget first so login modal opens on a clean screen
-        chatContainer.classList.remove("open")
+        const _cont = document.getElementById("chatbot-container")
+        if (_cont) _cont.classList.remove("open")
 
         setTimeout(() => {
           // Priority 1: host page's native signup button (production sites)

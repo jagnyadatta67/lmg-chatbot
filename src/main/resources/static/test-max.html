@@ -4,9 +4,81 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MAX — Widget Test</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5}
+    .demo-nav{background:#1a1a1a;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+    .demo-nav-brand{color:#D1AC88;font-size:20px;font-weight:800;letter-spacing:2px}
+    .demo-nav-actions{display:flex;gap:10px}
+    #account-actions-signup{
+      background:#D1AC88;color:#1a1a1a;border:none;
+      padding:8px 20px;border-radius:20px;font-weight:700;font-size:13px;cursor:pointer;
+    }
+    #account-actions-signup:hover{opacity:0.85}
+    .demo-body{padding:40px 24px;color:#333}
+    /* ── Login Modal ── */
+    .login-overlay{
+      display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);
+      z-index:99999;align-items:center;justify-content:center;
+    }
+    .login-overlay.open{display:flex}
+    .login-modal{
+      background:white;border-radius:16px;padding:32px;width:min(90vw,380px);
+      box-shadow:0 20px 60px rgba(0,0,0,0.25);position:relative;
+    }
+    .login-modal h3{font-size:20px;font-weight:700;margin-bottom:4px}
+    .login-modal p{font-size:13px;color:#888;margin-bottom:20px}
+    .login-input{
+      width:100%;border:1.5px solid #e5e7eb;border-radius:10px;
+      padding:12px 14px;font-size:14px;margin-bottom:12px;outline:none;
+    }
+    .login-input:focus{border-color:#D1AC88}
+    .login-btn{
+      width:100%;background:#1a1a1a;color:white;border:none;
+      padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;
+    }
+    .login-btn:hover{background:#333}
+    .login-close{
+      position:absolute;top:14px;right:16px;background:none;border:none;
+      font-size:20px;cursor:pointer;color:#888;
+    }
+  </style>
 </head>
 <body>
-  <h2>MAX Fashion — Chatbot Widget Test</h2>
+  <!-- Demo Navbar -->
+  <nav class="demo-nav">
+    <div class="demo-nav-brand">MAX</div>
+    <div class="demo-nav-actions">
+      <button id="account-actions-signup">Sign In / Register</button>
+    </div>
+  </nav>
+
+  <div class="demo-body">
+    <h2>MAX Fashion — Chatbot Widget Test</h2>
+    <p style="margin-top:8px;color:#666;font-size:13px">
+      Click the chat button (bottom right) → open widget → click "Login / Sign Up"<br>
+      → widget collapses → this login modal opens.
+    </p>
+  </div>
+
+  <!-- Demo Login Modal -->
+  <div class="login-overlay" id="demo-login-overlay">
+    <div class="login-modal">
+      <button class="login-close" onclick="document.getElementById('demo-login-overlay').classList.remove('open')">✕</button>
+      <h3>Sign In</h3>
+      <p>Demo login modal — triggered by chatbot widget</p>
+      <input class="login-input" type="email" placeholder="Email address" />
+      <input class="login-input" type="password" placeholder="Password" />
+      <button class="login-btn">Continue</button>
+    </div>
+  </div>
+
+  <!-- Wire signup button to open modal -->
+  <script>
+    document.getElementById("account-actions-signup").addEventListener("click", function() {
+      document.getElementById("demo-login-overlay").classList.add("open")
+    })
+  </script>
 
   <script src="http://localhost:8080/widget/chatbot-widget-res.js?v=92111"
           data-backend="http://localhost:8080/api/chat"

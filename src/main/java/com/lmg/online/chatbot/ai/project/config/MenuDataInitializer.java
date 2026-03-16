@@ -93,7 +93,7 @@ public class MenuDataInitializer implements CommandLineRunner {
         support.getSubMenus().addAll(List.of(
                 buildSub(support, "Find Nearby Store", "", "NEARBY_STORE",    1),
                 buildSub(support, "Policies & FAQs",   "", "POLICY_QUESTION", 2),
-                buildSub(support, "Write Us",   "", "TICKET", 2)
+                buildSub(support, "Write Us",   "", "WRITE_US", 3)
         ));
         menuRepo.save(support);
 

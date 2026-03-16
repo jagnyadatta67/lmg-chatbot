@@ -81,9 +81,19 @@ public class IntentClassifier {
           Examples: "check my gift card balance", "gift card balance", "how much is on my gift card".
           Do NOT use for policy questions: "how does gift card work" → use POLICY_QUESTION.
 
-        - WRITE_US: Customer wants to raise a ticket, lodge a complaint, or contact support.
-          Examples: "raise a ticket", "lodge a complaint", "talk to an agent",
-          "speak to a human", "escalate my issue", "contact support team".
+        - WRITE_US: Customer explicitly wants to raise a ticket, lodge a complaint, contact a human agent, OR is expressing clear frustration/anger about an unresolved personal issue.
+          Use when: user takes an action (raise ticket, file complaint, talk to agent) OR expresses strong negative emotion about their own situation.
+          Examples: "raise a ticket", "lodge a complaint", "talk to an agent", "speak to a human",
+          "escalate my issue", "contact support team", "I am very frustrated with my order",
+          "this is ridiculous, still not resolved", "no one is helping me",
+          "where is my refund", "money not credited", "I've been cheated",
+          "connect me to an agent", "give me my money back", "fraud", "scam",
+          "worst service ever", "I'm fed up", "been waiting for days", "I want to file a complaint".
+          Do NOT use WRITE_US for: policy questions ("what is the return policy", "how does exchange work"),
+          general how-to questions ("how do I cancel"), or informational queries even if they mention
+          "problem", "issue", "not working" in a casual/generic sense.
+          Rule: If the user is asking HOW something works or WHAT a policy is → POLICY_QUESTION.
+          If the user is venting, demanding action, or explicitly wants a human/ticket → WRITE_US.
 
         - GENERAL_QUERY: Greetings or completely unrelated questions.
           Examples: "hi", "hello", "what products do you sell", "do you have sale".
