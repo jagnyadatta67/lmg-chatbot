@@ -104,6 +104,7 @@ public class SupportTicketService {
 
         helper.setFrom(supportEmailFrom);
         helper.setTo(supportEmailTo);
+
         helper.setSubject(String.format("[%s | %s] Support Ticket %s — %s",
                 safe(req.getConcept()), safe(req.getAppid()), ticketId, safe(req.getCategory())));
         helper.setText(buildHtmlBody(req, ticketId), true);

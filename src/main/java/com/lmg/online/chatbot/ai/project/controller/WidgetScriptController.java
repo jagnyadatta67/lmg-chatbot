@@ -51,7 +51,8 @@ public class WidgetScriptController {
             Pattern.compile("https?://[a-z0-9-]+\\.trycloudflare\\.com(:\\d+)?")
     );
 
-    private static final String WIDGET_PATH = "widget/chatbot-widget.js";
+    private static final String WIDGET_PATH     = "widget/chatbot-widget.js";
+    private static final String WIDGET_RES_PATH = "widget/chatbot-widget-res.js";
 
     @GetMapping("/chatbot-widget.js")
     public ResponseEntity<String> serveWidget(HttpServletRequest request) {
@@ -82,6 +83,40 @@ public class WidgetScriptController {
 
         } catch (IOException e) {
             log.error("❌ Failed to read widget file: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("// Widget unavailable");
+        }
+    }
+
+    /** Responsive / new-look variant — GET /widget/chatbot-widget-res.js */
+    @GetMapping("/chatbot-widget-res.js")
+    public ResponseEntity<String> serveWidgetRes(HttpServletRequest request) {
+        String origin  = request.getHeader("Origin");
+        String referer = request.getHeader("Referer");
+        String source  = origin != null ? origin : referer;
+
+        if (!isAllowed(source)) {
+            log.warn("🚫 Widget-res access denied — Origin: [{}]  Referer: [{}]  IP: [{}]",
+                    origin, referer, request.getRemoteAddr());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("{\"error\":\"Access denied\",\"message\":\"This script is not available from your domain.\"}");
+        }
+
+        try {
+            ClassPathResource resource = new ClassPathResource(WIDGET_RES_PATH);
+            String content = FileCopyUtils.copyToString(
+                    new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8));
+
+            log.info("✅ Widget-res served — Origin: [{}]  IP: [{}]", source, request.getRemoteAddr());
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType("application/javascript"))
+                    .header("Cache-Control", "public, max-age=3600")
+                    .body(content);
+
+        } catch (IOException e) {
+            log.error("❌ Failed to read widget-res file: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("// Widget unavailable");
         }

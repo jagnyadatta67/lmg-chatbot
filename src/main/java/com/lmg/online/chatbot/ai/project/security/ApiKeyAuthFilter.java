@@ -59,7 +59,10 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
     private static final Set<String> PUBLIC_EXACT = Set.of(
             "/api/chat/health",
             "/",
-            "/index.html"
+            "/index.html",
+            "/favicon.ico",
+            "/favicon.png",
+            "/.well-known/appspecific/com.chrome.devtools.json"  // Chrome DevTools probe
     );
 
     /**
