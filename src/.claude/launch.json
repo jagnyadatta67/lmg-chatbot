@@ -5,7 +5,8 @@
       "name": "loipl",
       "runtimeExecutable": "mvn",
       "runtimeArgs": ["-f", "/Users/jagnyapanigrahi/Documents/LMG_CHATBOT/loipl/pom.xml", "spring-boot:run"],
-      "port": 8080
+      "port": 8080,
+      "autoPort": false
     }
   ]
 }

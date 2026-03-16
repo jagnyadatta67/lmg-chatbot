@@ -116,6 +116,8 @@
       dark: "#1a1a1a",
       light: "#f8f9fa",
       logo: "https://assets-cloud.landmarkshops.in/website_images/static-pages/brand_exp/brand2images/logos/prod/lifestyle-logo-136x46.svg",
+      logoSize: "48px",
+      logoFallback: "LIFESTYLE",
     },
     MAX: {
       primary: "#D1AC88",
@@ -123,6 +125,8 @@
       dark: "#1a1a1a",
       light: "#f8f9fa",
       logo: "https://assets-cloud.landmarkshops.in/website_images/in/logos/logo-max.svg",
+      logoSize: "48px",
+      logoFallback: "MAX",
     },
     BABYSHOP: {
       primary: "#819F83",
@@ -130,6 +134,8 @@
       dark: "#1a1a1a",
       light: "#f8f9fa",
       logo: "https://assets-cloud.landmarkshops.in/website_images/in/logos/logo-babyshop.svg",
+      logoSize: "42px",
+      logoFallback: "babyshop",
     },
     HOMECENTRE: {
       primary: "#7665A0",
@@ -137,6 +143,8 @@
       dark: "#1a1a1a",
       light: "#f8f9fa",
       logo: "https://assets-cloud.landmarkshops.in/website_images/in/logos/new-logo-homecentre.svg",
+      logoSize: "34px",
+      logoFallback: "HC",
     },
   }
 
@@ -1604,24 +1612,29 @@
       chatBody.scrollTop = chatBody.scrollHeight
 
       card.querySelector("#gate-login-btn").addEventListener("click", () => {
-        // Priority 1: host page's native signup button (production sites)
-        const signupBtn = document.getElementById("account-actions-signup")
-        if (signupBtn) {
-          signupBtn.click()
-          return
-        }
+        // Collapse widget first so login modal opens on a clean screen
+        chatContainer.classList.remove("open")
 
-        // Priority 2: login-modal-overlay (test / dev pages like index.html)
-        const loginOverlay = document.getElementById("login-modal-overlay")
-        if (loginOverlay) {
-          loginOverlay.classList.add("open")
-          const emailInput = document.getElementById("login-email")
-          if (emailInput) setTimeout(() => emailInput.focus(), 100)
-          return
-        }
+        setTimeout(() => {
+          // Priority 1: host page's native signup button (production sites)
+          const signupBtn = document.getElementById("account-actions-signup")
+          if (signupBtn) {
+            signupBtn.click()
+            return
+          }
 
-        // Priority 3: fire custom event — host page can listen and handle freely
-        window.dispatchEvent(new CustomEvent("chatbot:login-requested"))
+          // Priority 2: login-modal-overlay (test / dev pages like index.html)
+          const loginOverlay = document.getElementById("login-modal-overlay")
+          if (loginOverlay) {
+            loginOverlay.classList.add("open")
+            const emailInput = document.getElementById("login-email")
+            if (emailInput) setTimeout(() => emailInput.focus(), 100)
+            return
+          }
+
+          // Priority 3: fire custom event — host page can listen and handle freely
+          window.dispatchEvent(new CustomEvent("chatbot:login-requested"))
+        }, 150)
       })
 
       renderBackToMenu()
@@ -2522,9 +2535,17 @@
   function createFloatingButton(chatWindow, showGreeting) {
     const button = document.createElement("div")
     button.id = "chatbot-button"
+    const logoSize = theme.logoSize || "48px"
+    const logoFallback = theme.logoFallback || config.concept
     button.innerHTML = `
       <div class="chat-fab-icon">
-        <img src="${theme.logo}" alt="${config.concept}" />
+        <img src="${theme.logo}" alt="${config.concept}"
+             style="width:${logoSize}; height:auto; object-fit:contain;"
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+        <span class="chat-fab-text" style="display:none; font-size:10px; font-weight:700;
+              color:${theme.primary}; text-align:center; line-height:1.2; padding:4px;">
+          ${logoFallback}
+        </span>
       </div>
       <div class="chat-fab-badge">💬</div>`
 

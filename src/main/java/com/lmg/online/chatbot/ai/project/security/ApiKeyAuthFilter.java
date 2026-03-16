@@ -60,6 +60,10 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             "/api/chat/health",
             "/",
             "/index.html",
+            "/test-max.html",
+            "/test-lifestyle.html",
+            "/test-babyshop.html",
+            "/test-homecentre.html",
             "/favicon.ico",
             "/favicon.png",
             "/.well-known/appspecific/com.chrome.devtools.json"  // Chrome DevTools probe

@@ -119,10 +119,15 @@
     },
     MAX: {
       primary: "#D1AC88",
-      secondary: "#4A55E2",
+      secondary: "#b8916a",
       dark: "#1a1a1a",
-      light: "#f8f9fa",
-      logo: "https://assets-cloud.landmarkshops.in/website_images/in/logos/logo-max.svg",
+      light: "#ffffff",
+      headerBg: "#ffffff",
+      headerText: "#1a1a1a",
+      headerBorder: "0 0 1px 0",
+      headerBorderColor: "#D1AC88",
+      containerBorder: "1px solid #D1AC88",
+      logo: "https://assets-cloud.landmarkshops.in/website_images/in/logos/new-max-logo-90x40.svg",
     },
     BABYSHOP: {
       primary: "#819F83",
@@ -177,11 +182,17 @@
       #chatbot-button:active { transform: scale(0.94); }
 
       .chat-fab-icon {
-        width: 100%; height: 100%;
+        width: 78%; height: 78%;
         display: flex; align-items: center; justify-content: center;
-        border-radius: 50%; overflow: hidden;
+        background: rgba(255,255,255,0.92);
+        border-radius: 50%;
+        padding: 6px;
       }
-      .chat-fab-icon img { width: 42px; height: 42px; object-fit: contain; filter: brightness(0) invert(1); }
+      .chat-fab-icon img {
+        width: 100%; height: 100%;
+        object-fit: contain;
+        /* No color filter — show logo in original brand colors */
+      }
 
       .chat-fab-badge {
         position: absolute;
@@ -207,8 +218,9 @@
         right: 28px;
         width: min(92vw, 420px);
         height: min(82vh, 660px);
-        background: #f5f7fa;
+        background: #ffffff;
         border-radius: 20px;
+        border: ${theme.containerBorder || "none"};
         box-shadow: 0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08);
         display: none;
         flex-direction: column;
@@ -268,8 +280,9 @@
 
       /* ── Header ─────────────────────────────────────────────────────────── */
       .chat-header {
-        background: linear-gradient(135deg, ${theme.primary} 0%, ${theme.secondary} 100%);
-        color: white;
+        background: ${theme.headerBg || `linear-gradient(135deg, ${theme.primary} 0%, ${theme.secondary} 100%)`};
+        color: ${theme.headerText || "white"};
+        border-bottom: ${theme.headerBorderColor ? `2px solid ${theme.headerBorderColor}` : "none"};
         padding: 14px 16px 14px;
         display: flex;
         align-items: center;
@@ -282,19 +295,20 @@
       }
       .chat-header-avatar {
         width: 40px; height: 40px;
-        background: rgba(255,255,255,0.22);
+        background: ${theme.headerBg ? `rgba(0,0,0,0.06)` : `rgba(255,255,255,0.22)`};
         border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         font-size: 20px;
         flex-shrink: 0;
-        border: 2px solid rgba(255,255,255,0.35);
+        border: 2px solid ${theme.headerBg ? `#D1AC88` : `rgba(255,255,255,0.35)`};
       }
       .chat-header-info { display: flex; flex-direction: column; gap: 2px; }
       .chat-header-logo {
-        height: 22px; width: auto; object-fit: contain;
+        height: 28px; width: auto; object-fit: contain;
       }
       .chat-header-logo.max-concept {
-        filter: brightness(0) invert(1);
+        /* No filter — MAX logo shows in natural dark colors on white header */
+        filter: none;
       }
       .chat-header-title {
         font-size: 14px; font-weight: 700; letter-spacing: 0.2px;
@@ -315,7 +329,8 @@
       .chat-header-actions { display: flex; align-items: center; gap: 4px; }
       #close-chat {
         width: 32px; height: 32px;
-        background: rgba(255,255,255,0.18);
+        background: ${theme.headerBg ? `rgba(0,0,0,0.08)` : `rgba(255,255,255,0.18)`};
+        color: ${theme.headerText || "white"};
         border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         cursor: pointer; font-size: 16px;
@@ -1415,24 +1430,29 @@
       chatBody.scrollTop = chatBody.scrollHeight
 
       card.querySelector("#gate-login-btn").addEventListener("click", () => {
-        // Priority 1: host page's native signup button (production sites)
-        const signupBtn = document.getElementById("account-actions-signup")
-        if (signupBtn) {
-          signupBtn.click()
-          return
-        }
+        // Collapse widget first so login modal opens on a clean screen
+        chatContainer.classList.remove("open")
 
-        // Priority 2: login-modal-overlay (test / dev pages like index.html)
-        const loginOverlay = document.getElementById("login-modal-overlay")
-        if (loginOverlay) {
-          loginOverlay.classList.add("open")
-          const emailInput = document.getElementById("login-email")
-          if (emailInput) setTimeout(() => emailInput.focus(), 100)
-          return
-        }
+        setTimeout(() => {
+          // Priority 1: host page's native signup button (production sites)
+          const signupBtn = document.getElementById("account-actions-signup")
+          if (signupBtn) {
+            signupBtn.click()
+            return
+          }
 
-        // Priority 3: fire custom event — host page can listen and handle freely
-        window.dispatchEvent(new CustomEvent("chatbot:login-requested"))
+          // Priority 2: login-modal-overlay (test / dev pages like index.html)
+          const loginOverlay = document.getElementById("login-modal-overlay")
+          if (loginOverlay) {
+            loginOverlay.classList.add("open")
+            const emailInput = document.getElementById("login-email")
+            if (emailInput) setTimeout(() => emailInput.focus(), 100)
+            return
+          }
+
+          // Priority 3: fire custom event — host page can listen and handle freely
+          window.dispatchEvent(new CustomEvent("chatbot:login-requested"))
+        }, 150)
       })
 
       renderBackToMenu()
