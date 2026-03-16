@@ -804,6 +804,72 @@
       .write-us-submit:hover { opacity: 0.9; }
       .write-us-submit:disabled { opacity: 0.6; cursor: not-allowed; }
 
+      /* ── Login Gate Card ───────────────────────────────────────────────── */
+      .login-gate {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f6ff 100%);
+        border: 1.5px solid #e8e0ff;
+        border-radius: 16px;
+        padding: 20px 18px 18px;
+        margin: 8px 0;
+        text-align: center;
+        box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+        animation: gateSlideIn 0.3s ease;
+      }
+      @keyframes gateSlideIn {
+        from { opacity: 0; transform: translateY(12px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      .login-gate-lock {
+        font-size: 36px;
+        line-height: 1;
+        margin-bottom: 8px;
+      }
+      .login-gate-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1a1a1a;
+        margin: 0 0 6px;
+      }
+      .login-gate-sub {
+        font-size: 12px;
+        color: #666;
+        margin: 0 0 14px;
+        line-height: 1.5;
+      }
+      .login-gate-perks {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 16px;
+        text-align: left;
+      }
+      .login-gate-perks li {
+        font-size: 12px;
+        color: #444;
+        padding: 3px 0;
+      }
+      .login-gate-perks li::before {
+        content: "✅ ";
+      }
+      .login-gate-btn {
+        display: inline-block;
+        width: 100%;
+        padding: 11px 0;
+        border: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        letter-spacing: 0.3px;
+        transition: opacity 0.2s, transform 0.1s;
+      }
+      .login-gate-btn:hover  { opacity: 0.88; transform: translateY(-1px); }
+      .login-gate-btn:active { transform: translateY(0); }
+      .login-gate-or {
+        font-size: 11px;
+        color: #aaa;
+        margin: 10px 0 0;
+      }
+
       /* Responsive Design */
       @media (max-width: 480px) {
         #chatbot-button {
@@ -1497,6 +1563,70 @@
       enableInput("Type your message...")
     }
 
+    /** Returns true when a real customer is logged in (not anonymous). */
+    function isLoggedIn() {
+      return session.customerId && session.customerId !== "anonymous"
+    }
+
+    /**
+     * Renders a beautiful login-gate card inside the chat body.
+     *
+     * @param {string} context  - Short phrase describing what requires login,
+     *                            e.g. "track your orders", "view wallet balance"
+     */
+    function renderLoginGate(context = "access your account") {
+      const PERKS = [
+        "Track orders & live delivery status",
+        "View full order history",
+        "Check wallet & gift card balance",
+        "Manage returns & refunds instantly",
+      ]
+
+      const card = document.createElement("div")
+      card.className = "login-gate"
+      card.innerHTML = `
+        <div class="login-gate-lock">🔐</div>
+        <p class="login-gate-title">Sign in to ${context}</p>
+        <p class="login-gate-sub">
+          Your personal dashboard is just one tap away.<br>
+          Log in to unlock everything.
+        </p>
+        <ul class="login-gate-perks">
+          ${PERKS.map(p => `<li>${p}</li>`).join("")}
+        </ul>
+        <button class="login-gate-btn" id="gate-login-btn"
+          style="background:${theme.primary}; color:#fff;">
+          🚀 Login / Sign Up
+        </button>
+        <p class="login-gate-or">It only takes a few seconds ✨</p>
+      `
+      chatBody.appendChild(card)
+      chatBody.scrollTop = chatBody.scrollHeight
+
+      card.querySelector("#gate-login-btn").addEventListener("click", () => {
+        // Priority 1: host page's native signup button (production sites)
+        const signupBtn = document.getElementById("account-actions-signup")
+        if (signupBtn) {
+          signupBtn.click()
+          return
+        }
+
+        // Priority 2: login-modal-overlay (test / dev pages like index.html)
+        const loginOverlay = document.getElementById("login-modal-overlay")
+        if (loginOverlay) {
+          loginOverlay.classList.add("open")
+          const emailInput = document.getElementById("login-email")
+          if (emailInput) setTimeout(() => emailInput.focus(), 100)
+          return
+        }
+
+        // Priority 3: fire custom event — host page can listen and handle freely
+        window.dispatchEvent(new CustomEvent("chatbot:login-requested"))
+      })
+
+      renderBackToMenu()
+    }
+
     function checkAndTriggerLogin(payload, defaultMsg = "Please login to continue.") {
       const cht = payload?.data?.chat_message || payload?.chat_message || ""
       const normalizedMsg = cht.trim().toLowerCase()
@@ -1765,17 +1895,31 @@
      *
      * To add a new integration, just add a new key → async function entry here.
      */
+    // ─── Auth-required intent keys ─────────────────────────────────────────
+    // Any key listed here will show renderLoginGate() for anonymous users
+    // instead of hitting the backend. Add new auth-protected intents here.
+    const AUTH_REQUIRED_INTENTS = {
+      TRACK_ORDER:      "track your orders",
+      ORDER_LISTING:    "view your order history",
+      DELIVERY_TRACKING:"track your deliveries",
+      RETURN_STATUS:    "check your return & refund status",
+      WALLET_BALANCE:   "view your wallet balance",
+      CUSTOMER_PROFILE: "access your account & profile",
+    }
+
     const SUBMENU_INTENT_HANDLERS = {
+      // ── No auth required ──────────────────────────────────────────────────
       NEARBY_STORE:        async () => { await handleNearbyStore() },
       GIFT_CARD_BALANCE:   async () => { await handleGiftCardBalance() },
+      // Write Us — opens the support ticket form directly (no backend call needed)
+      WRITE_US:            () => { handleWriteUs({}) },
+
+      // ── Auth-required (gate shows instantly for anonymous users) ──────────
       TRACK_ORDER:         async () => { await handleOrderTrackMenu() },
-      // ── new intents ────────────────────────────────────────────────────────
       ORDER_LISTING:       async () => { await handleOrderListingMenu() },
       DELIVERY_TRACKING:   async () => { await handleDeliveryTrackingMenu() },
       RETURN_STATUS:       async () => { await handleReturnStatusMenu() },
       WALLET_BALANCE:      async () => { await handleWalletBalanceMenu() },
-      // Write Us — opens the support ticket form directly (no backend call needed)
-      WRITE_US:            () => { handleWriteUs({}) },
       // My Profile — awaits pre-fetch then reads from session cache
       CUSTOMER_PROFILE:    async () => {
         if (profileCachePromise) await profileCachePromise
@@ -1788,6 +1932,13 @@
       renderUserMessage((sub.icon ? sub.icon + " " : "") + sub.title)
 
       const key     = (sub.intentKey || "").trim().toUpperCase()
+
+      // ── Auth gate: show login card immediately for anonymous users ────────
+      if (!isLoggedIn() && AUTH_REQUIRED_INTENTS[key]) {
+        renderLoginGate(AUTH_REQUIRED_INTENTS[key])
+        return
+      }
+
       const handler = SUBMENU_INTENT_HANDLERS[key]
 
       if (handler) {
@@ -2365,6 +2516,7 @@
     }
 
     createFloatingButton(chatWindow, showGreeting)
+
   }
 
   function createFloatingButton(chatWindow, showGreeting) {

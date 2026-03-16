@@ -101,6 +101,13 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                                     FilterChain         filterChain)
             throws ServletException, IOException {
 
+        // CORS preflight — browsers never send auth headers on OPTIONS requests.
+        // Pass through so Spring's CORS filter can respond with the correct headers.
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String providedKey = request.getHeader(apiKeyHeader);
 
         // 1. Key present?

@@ -60,8 +60,8 @@ public class TokenDetailsController {
     public ResponseEntity<UserWsDTO> getTokenDetails(
             @Valid @RequestBody TokenDetailsRequest request) {
 
-        log.info("📨 token-details → concept={}, env={}, appId={}",
-                request.getConcept(), request.getEnv(), request.getAppId());
+        log.info("📨 token-details → concept={}, env={}, appId={} token={}",
+                request.getConcept(), request.getEnv(), request.getAppId(),request.getToken());
 
         UserWsDTO userWsDTO = tokenDetailsService.getTokenDetails(
                 request.getConcept(),

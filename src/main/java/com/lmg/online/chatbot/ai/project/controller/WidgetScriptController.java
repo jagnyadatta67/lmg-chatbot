@@ -42,7 +42,13 @@ public class WidgetScriptController {
             Pattern.compile("https?://([a-z0-9-]+\\.)?homecentre\\.in(:\\d+)?"),
             Pattern.compile("https?://([a-z0-9-]+\\.)?landmarkshops\\.in(:\\d+)?"),
             Pattern.compile("https?://localhost(:\\d+)?"),
-            Pattern.compile("https?://127\\.0\\.0\\.1(:\\d+)?")
+            Pattern.compile("https?://127\\.0\\.0\\.1(:\\d+)?"),
+            // Internal network IPs — dev/testing only
+            Pattern.compile("https?://10\\.\\d+\\.\\d+\\.\\d+(:\\d+)?"),
+            Pattern.compile("https?://192\\.168\\.\\d+\\.\\d+(:\\d+)?"),
+            Pattern.compile("https?://172\\.(1[6-9]|2[0-9]|3[0-1])\\.\\d+\\.\\d+(:\\d+)?"),
+            // Cloudflare tunnel — dev/testing only
+            Pattern.compile("https?://[a-z0-9-]+\\.trycloudflare\\.com(:\\d+)?")
     );
 
     private static final String WIDGET_PATH = "widget/chatbot-widget.js";
@@ -82,7 +88,8 @@ public class WidgetScriptController {
     }
 
     private boolean isAllowed(String source) {
-        if (source == null || source.isBlank()) return false;
+        // Direct access (no Origin/Referer) — curl, browser direct URL, internal fetch
+        if (source == null || source.isBlank()) return true;
         // trim to just origin part if a full Referer URL was passed
         String origin = extractOrigin(source);
         return ALLOWED_ORIGINS.stream().anyMatch(p -> p.matcher(origin).matches());

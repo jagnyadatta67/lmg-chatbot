@@ -16,6 +16,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import org.springframework.http.HttpMethod;
+
 import java.util.List;
 
 /**
@@ -71,6 +73,8 @@ public class SecurityConfigs {
 
             // Authorization rules
             .authorizeHttpRequests(auth -> auth
+                    // CORS preflight — browsers never send auth headers on OPTIONS
+                    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .requestMatchers(PUBLIC_PATHS).permitAll()
                     .requestMatchers("/api/**").authenticated()
                     .anyRequest().permitAll()
@@ -111,13 +115,24 @@ public class SecurityConfigs {
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowedOriginPatterns(List.of(
+                // Brand domains — standard HTTPS + any dev port
                 "https://*.maxfashion.in",
+                "https://*.maxfashion.in:*",
                 "https://*.lifestylestores.com",
+                "https://*.lifestylestores.com:*",
                 "https://*.babyshop.in",
+                "https://*.babyshop.in:*",
                 "https://*.homecentre.in",
+                "https://*.homecentre.in:*",
                 "https://*.landmarkshops.in",
+                "https://*.landmarkshops.in:*",
+                // Local development
                 "http://localhost:*",
-                "http://127.0.0.1:*"
+                "https://localhost:*",
+                "http://127.0.0.1:*",
+                "https://127.0.0.1:*",
+                // Cloudflare tunnel — dev/testing only
+                "https://*.trycloudflare.com"
         ));
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));

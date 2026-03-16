@@ -1,5 +1,6 @@
 package com.lmg.online.chatbot.ai.tools.giftcard;
 
+import com.lmg.online.chatbot.ai.auth.AnonymousTokenService;
 import com.lmg.online.chatbot.ai.auth.AuthenticationServiceUtil;
 import com.lmg.online.chatbot.ai.common.ConceptBaseUrlResolver;
 import com.lmg.online.chatbot.ai.tools.giftcard.dto.GiftCardBalanceRequest;
@@ -38,6 +39,9 @@ public class GiftCardBalanceTool {
     @Autowired
     private AuthenticationServiceUtil authenticationServiceUtil;
 
+    @Autowired
+    private AnonymousTokenService anonymousTokenService;
+
     /**
      * Check the balance on a gift card.
      *
@@ -61,6 +65,11 @@ public class GiftCardBalanceTool {
                 concept, env, appId, maskCard(cardNumber));
 
         try {
+            // Resolve token: use caller's token if present, otherwise fetch anonymous token
+            String tokenToUse = (accessToken != null && !accessToken.isBlank())
+                    ? accessToken
+                    : anonymousTokenService.getToken(concept, env, appId);
+
             String url = ConceptBaseUrlResolver.buildApiUrl(
                     concept, env, "/en/users/anonymous/gift-card/balance", appId);
 
@@ -68,7 +77,7 @@ public class GiftCardBalanceTool {
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("access_token", accessToken);
+            headers.set("access_token", tokenToUse);
 
             GiftCardBalanceRequest body = new GiftCardBalanceRequest(
                     cardNumber, pin != null ? pin : "");
@@ -86,7 +95,10 @@ public class GiftCardBalanceTool {
             log.info("✅ [GiftCardBalanceTool] errorOccurred={}, active={}, amount={}",
                     response.isErrorOccurred(), response.isActive(),
                     response.getAmount() != null ? response.getAmount().getFormattedValue() : "null");
-            if(!CollectionUtils.isEmpty(response.getErrors()) && "lmg.giftcard.client.server.error".equalsIgnoreCase(response.getErrors().get(1).getReason())){
+            if(!CollectionUtils.isEmpty(response.getErrors()) &&
+                    ("lmg.giftcard.client.server.error".equalsIgnoreCase(response.getErrors().get(0).getReason())
+                            || "lmg.giftcard.unsuccessful".equalsIgnoreCase(response.getErrors().get(0).getReason()))){
+
 
                 log.info("✅ [GiftCardBalanceTool] Retry errorOccurred={}, active={}, amount={}",
                         response.isErrorOccurred(), response.isActive(),
