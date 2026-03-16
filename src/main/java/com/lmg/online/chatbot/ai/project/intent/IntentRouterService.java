@@ -53,8 +53,15 @@ public class IntentRouterService {
         log.info("📨 Processing query: {}", query);
 
         try {
-            // Step 1: Try pattern-based routing first (fast path — no AI token cost)
-            IntentHandler<?> handler = findHandlerByPattern(query);
+            // Step 0: intentHint bypass — frontend already knows the intent
+            // (e.g. user entered an order number after ORDER_TRACKING prompted for it).
+            // Skip pattern matching and AI classification entirely.
+            IntentHandler<?> handler = resolveByIntentHint(request);
+
+            if (handler == null) {
+                // Step 1: Try pattern-based routing first (fast path — no AI token cost)
+                handler = findHandlerByPattern(query);
+            }
 
             // Step 2: If no pattern match, use AI classifier
             if (handler == null) {
@@ -75,6 +82,24 @@ public class IntentRouterService {
             log.error("❌ Error processing query: {}", query, e);
             return handleError(request, startTime, e);
         }
+    }
+
+    /**
+     * Step 0 bypass: when the frontend explicitly pins an intent via {@code intentHint},
+     * skip all classification and return the matching handler directly.
+     * Returns {@code null} if no hint is set or the hint doesn't match a registered handler.
+     */
+    private IntentHandler<?> resolveByIntentHint(ChatRequest request) {
+        String hint = request.getIntentHint();
+        if (hint == null || hint.isBlank()) return null;
+        String normalized = hint.trim().toUpperCase();
+        IntentHandler<?> handler = intentHandlers.get(normalized);
+        if (handler != null) {
+            log.info("📌 intentHint bypass → {}", normalized);
+        } else {
+            log.warn("⚠️ intentHint '{}' not recognised — falling through to normal routing", normalized);
+        }
+        return handler;
     }
 
     /**

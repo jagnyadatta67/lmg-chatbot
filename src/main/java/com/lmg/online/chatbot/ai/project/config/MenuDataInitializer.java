@@ -92,7 +92,8 @@ public class MenuDataInitializer implements CommandLineRunner {
         ChatMenu support = buildMenu(concept, "Store & Support", "", 3);
         support.getSubMenus().addAll(List.of(
                 buildSub(support, "Find Nearby Store", "", "NEARBY_STORE",    1),
-                buildSub(support, "Policies & FAQs",   "", "POLICY_QUESTION", 2)
+                buildSub(support, "Policies & FAQs",   "", "POLICY_QUESTION", 2),
+                buildSub(support, "Write Us",   "", "TICKET", 2)
         ));
         menuRepo.save(support);
 

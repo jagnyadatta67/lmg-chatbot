@@ -19,4 +19,10 @@ public class OrderResponse{
         private String mobileNo;
         @JsonProperty(required = true, value = "orderDetailsList")
         private List<OrderDetail> orderDetailsList;
+        /**
+         * When true the frontend should show an order-number input field
+         * so the user can provide a number and retry ORDER_TRACKING.
+         */
+        @JsonProperty(value = "needsOrderNumber")
+        private boolean needsOrderNumber;
 }

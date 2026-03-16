@@ -27,8 +27,12 @@ import java.util.regex.Pattern;
 public class ChatbotOrderIntentHandler implements IntentHandler<ChatbotOrderListResponse> {
 
     private static final Pattern ORDER_LIST_PATTERN = Pattern.compile(
-            ".*\\b(my\\s*orders?|order\\s*history|recent\\s*orders?|list.*orders?|" +
-            "what.*bought|purchase.*history|all.*orders?)\\b.*",
+            // Only match PLURAL "orders" or explicit listing phrases — never match singular "order"
+            // so that "get my order", "my order status" etc. fall through to ORDER_TRACKING
+            ".*\\b(orders|my\\s*orders|show\\s*(my\\s*)?orders|view\\s*(my\\s*)?orders|" +
+            "order\\s*histor(y|ies)|order\\s*list|recent\\s*orders|past\\s*orders|" +
+            "all\\s*(my\\s*)?orders|list.*orders|what.*bought|what.*ordered|" +
+            "purchase.*histor(y|ies)|my\\s*purchases)\\b.*",
             Pattern.CASE_INSENSITIVE
     );
 

@@ -136,7 +136,7 @@ public class OrderTrackingIntentHandler implements IntentHandler<OrderResponse> 
         r.setChat_message(
                 "Please share your order number so I can look it up. " +
                 "Order numbers are numeric, e.g. 9419396447.");
-        r.setOrderDetailsList(Collections.emptyList());
+        r.setNeedsOrderNumber(true);   // signals frontend to open order-number input
         return r;
     }
 

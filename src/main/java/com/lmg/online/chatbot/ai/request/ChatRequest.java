@@ -55,4 +55,17 @@ public class ChatRequest {
      * The handler also extracts it from {@code message} via regex as a fallback.
      */
     private String orderNo;
+
+    /**
+     * Optional intent pin set by the frontend to bypass AI classification entirely.
+     * When present and non-blank, IntentRouterService routes directly to this intent's
+     * handler without running pattern matching or the AI classifier.
+     *
+     * Use this when the frontend already knows the intent (e.g. user entered an order
+     * number in a dedicated input field after ORDER_TRACKING prompted for it).
+     *
+     * Values must match an exact intent string registered in IntentRouterService,
+     * e.g. "ORDER_TRACKING", "DELIVERY_TRACKING", "RETURN_STATUS".
+     */
+    private String intentHint;
 }

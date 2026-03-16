@@ -1423,10 +1423,12 @@
     function handleOrderTracking(payload) {
       if (checkAndTriggerLogin(payload, "Please login to check your order details.")) return
 
-      // AI returned a message but no real data → needs order number from user
-      if (payload.chat_message && payload.chat_message.trim() !== "" && !Array.isArray(payload.orderDetailsList)) {
-        renderBotMessage(payload.chat_message)
-        openOrderInput("Enter your order number...", (msg) => sendMessage(null, msg))
+      // Backend explicitly signalled it needs an order number from the user
+      if (payload.needsOrderNumber) {
+        renderBotMessage(payload.chat_message || "Please share your order number so I can look it up.")
+        openOrderInput("Enter your order number...", (msg) =>
+          sendMessageWithIntent("ORDER_TRACKING", msg, { orderNo: msg })
+        )
         return
       }
 
@@ -1614,6 +1616,34 @@
       handler(payload)
     }
 
+    /**
+     * Like sendMessage, but pins the intent on the backend via `intentHint` so the
+     * backend skips AI classification entirely and goes straight to the correct handler.
+     *
+     * Use this as the onSubmit callback inside openOrderInput whenever the frontend
+     * already knows which intent should handle the follow-up (e.g. the user just
+     * entered an order number after ORDER_TRACKING or DELIVERY_TRACKING asked for it).
+     *
+     * @param {string} intentHint  - Exact intent string, e.g. "ORDER_TRACKING"
+     * @param {string} userMessage - The text the user typed (shown in chat + sent as message)
+     * @param {object} [extra]     - Extra fields merged into the request body (e.g. { orderNo })
+     */
+    async function sendMessageWithIntent(intentHint, userMessage, extra = {}) {
+      const { data: json, error } = await api.chat(userMessage, { intentHint, ...extra })
+      if (error || !json) {
+        renderBotMessage("⚠️ Something went wrong. Please try again.")
+        renderBackToMenu()
+        enableInput("Type your message...")
+        return
+      }
+      console.log("🧠 Chatbot Response (pinned intent=" + intentHint + "):", json)
+      // Prefer the intent echoed back by the backend; fall back to the hint we sent
+      const intent = json.intent || json.data?.intent || intentHint || "DEFAULT"
+      const payload = typeof json.data === "string" ? { chat_message: json.data } : json.data || json
+      const handler = INTENT_HANDLERS[intent] || INTENT_HANDLERS.DEFAULT
+      handler(payload)
+    }
+
     async function showGreeting() {
       clearBody()
       enableInput("Type your message...")
@@ -1718,101 +1748,11 @@
       chatBody.appendChild(sbtn)
     }
 
-    // ─── Topic Intercept (text-input only) ──────────────────────────────────
-    // When a user types a vague topic keyword (e.g. "gift card", "my orders"),
-    // we render the relevant submenu buttons inline WITHOUT calling the API.
-    // Rules:
-    //   - Message has 7+ digit sequence → order no or GC no → skip intercept
-    //   - Message has > 6 words          → full question → skip intercept
-    //   - Otherwise → check pattern → render submenu inline if match
-
-    const TOPIC_INTERCEPT = [
-      {
-        pattern: /\b(gift\s*card|giftcard|gift\s*voucher|voucher|\bgc\b|card\s*balance|e[\s-]?gift)\b/i,
-        label:   "Here are your Gift Card options:",
-        subs: [
-          { title: "Check Balance", intentKey: "GIFT_CARD_BALANCE", icon: "💳" },
-        ],
-      },
-      {
-        pattern: /\b(my\s*orders?|order\s*history|past\s*orders?|previous\s*orders?|purchases?|bought|shopping\s*history|all\s*orders?)\b/i,
-        label:   "Here are your Order options:",
-        subs: [
-          { title: "Order History",   intentKey: "ORDER_LISTING",      icon: "📋" },
-          { title: "Track My Order",  intentKey: "TRACK_ORDER",        icon: "📦" },
-          { title: "Delivery Status", intentKey: "DELIVERY_TRACKING",  icon: "🚚" },
-          { title: "Return / Refund", intentKey: "RETURN_STATUS",      icon: "↩️" },
-        ],
-      },
-      {
-        pattern: /\b(track|tracking|shipment|shipped|dispatch(ed)?|out\s*for\s*delivery|delivery\s*status|delivery\s*update)\b/i,
-        label:   "Track your delivery:",
-        subs: [
-          { title: "Track My Order",  intentKey: "TRACK_ORDER",       icon: "📦" },
-          { title: "Delivery Status", intentKey: "DELIVERY_TRACKING", icon: "🚚" },
-        ],
-      },
-      {
-        pattern: /\b(return|refund|exchange|cancel(lation)?|replace(ment)?|damaged|wrong\s*item|missing\s*item|money\s*back)\b/i,
-        label:   "Return & Refund options:",
-        subs: [
-          { title: "Return / Refund", intentKey: "RETURN_STATUS", icon: "↩️" },
-        ],
-      },
-      {
-        pattern: /\b(store|stores|near\s*me|nearest\s*store|find\s*store|store\s*location|branch|outlet|shop\s*near|locate\s*store)\b/i,
-        label:   "Find a store near you:",
-        subs: [
-          { title: "Nearby Stores", intentKey: "NEARBY_STORE", icon: "📍" },
-        ],
-      },
-      {
-        pattern: /\b(wallet|points|cashback|rewards?|loyalty|lmg\s*points|earned\s*points|my\s*points|my\s*wallet)\b/i,
-        label:   "Your Wallet:",
-        subs: [
-          { title: "My Wallet", intentKey: "WALLET_BALANCE", icon: "👛" },
-        ],
-      },
-      {
-        pattern: /\b(my\s*profile|my\s*account|profile|account|personal\s*details?|my\s*info|account\s*details?)\b/i,
-        label:   "Account options:",
-        subs: [
-          { title: "My Profile", intentKey: "CUSTOMER_PROFILE", icon: "👤" },
-          { title: "My Wallet",  intentKey: "WALLET_BALANCE",   icon: "👛" },
-        ],
-      },
-    ]
-
-    /**
-     * Returns a matching TOPIC_INTERCEPT entry for vague/broad messages,
-     * or null if the message should be sent to the API directly.
-     */
-    /**
-     * Option C — intercept ONLY short (1–2 word) exact navigation phrases.
-     * Anything longer or with digits goes straight to the AI via sendMessage().
-     * The AI intent result then drives the widget rendering via INTENT_HANDLERS.
-     */
-    function tryTopicIntercept(message) {
-      const clean = message.trim()
-      if (/\d/.test(clean)) return null                    // contains any digit → skip
-      if (clean.split(/\s+/).length > 2) return null       // 3+ words → let AI decide
-      return TOPIC_INTERCEPT.find(t => t.pattern.test(clean)) || null
-    }
-
     /**
      * Handles free-text input from the chat input box.
-     * Topic intercept is applied first; if matched the relevant submenu
-     * buttons are rendered inline without any API call.
-     * Falls through to sendMessage() for all other input.
+     * All messages go directly to the backend — no frontend interception.
      */
     function handleFreeTextSend(msg) {
-      const intercept = tryTopicIntercept(msg)
-      if (intercept) {
-        renderBotMessage(intercept.label)
-        intercept.subs.forEach(sub => renderSubmenuButton(sub))
-        renderBackToMenu()
-        return
-      }
       sendMessage(null, msg)
     }
 
@@ -1834,6 +1774,8 @@
       DELIVERY_TRACKING:   async () => { await handleDeliveryTrackingMenu() },
       RETURN_STATUS:       async () => { await handleReturnStatusMenu() },
       WALLET_BALANCE:      async () => { await handleWalletBalanceMenu() },
+      // Write Us — opens the support ticket form directly (no backend call needed)
+      WRITE_US:            () => { handleWriteUs({}) },
       // My Profile — awaits pre-fetch then reads from session cache
       CUSTOMER_PROFILE:    async () => {
         if (profileCachePromise) await profileCachePromise
@@ -2018,6 +1960,7 @@
       if (payload.chatMessage && payload.chatMessage.trim() !== "") {
         renderBotMessage(payload.chatMessage)
         renderBackToMenu()
+        enableInput("Type your message...")
         return
       }
 
@@ -2030,6 +1973,7 @@
       if (orders.length === 0) {
         renderBotMessage("📦 No orders found in your history.")
         renderBackToMenu()
+        enableInput("Type your message...")
         return
       }
 
@@ -2094,6 +2038,7 @@
       })
       chatBody.scrollTop = chatBody.scrollHeight
       renderBackToMenu()
+      enableInput("Type your message...")
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -2103,7 +2048,9 @@
     /** Called when user taps "🚚 Delivery Status" submenu button. */
     async function handleDeliveryTrackingMenu() {
       renderBotMessage("🚚 Please enter your <b>Order Number</b> to check your delivery status. Example: <i>LS12345678</i>")
-      openOrderInput("Enter your order number...", (msg) => sendMessage(null, msg))
+      openOrderInput("Enter your order number...", (msg) =>
+        sendMessageWithIntent("DELIVERY_TRACKING", msg, { orderNo: msg })
+      )
     }
 
     /**
@@ -2113,10 +2060,12 @@
     function handleDeliveryTrackingResponse(payload) {
       if (checkAndTriggerLogin(payload, "Please sign in to check your delivery status.")) return
 
-      // AI returned a message but no real data → needs order number from user
+      // Backend returned a message but no delivery data → needs order number from user
       if (payload.chatMessage && payload.chatMessage.trim() !== "") {
         renderBotMessage(payload.chatMessage)
-        openOrderInput("Enter your order number...", (msg) => sendMessage(null, msg))
+        openOrderInput("Enter your order number...", (msg) =>
+          sendMessageWithIntent("DELIVERY_TRACKING", msg, { orderNo: msg })
+        )
         return
       }
 
@@ -2124,6 +2073,7 @@
       if (items.length === 0) {
         renderBotMessage("🚚 No delivery details found for that order.")
         renderBackToMenu()
+        enableInput("Type your message...")
         return
       }
 
@@ -2148,6 +2098,7 @@
       })
       chatBody.scrollTop = chatBody.scrollHeight
       renderBackToMenu()
+      enableInput("Type your message...")
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -2160,7 +2111,9 @@
         "↩️ Please enter your <b>Order Number</b> to check your return / refund status. " +
         "Example: <i>LS12345678</i>"
       )
-      openOrderInput("Enter your order number...", (msg) => sendMessage(null, msg))
+      openOrderInput("Enter your order number...", (msg) =>
+        sendMessageWithIntent("RETURN_STATUS", msg, { orderNo: msg })
+      )
     }
 
     /**
@@ -2171,10 +2124,12 @@
     function handleReturnStatusResponse(payload) {
       if (checkAndTriggerLogin(payload, "Please sign in to check your return status.")) return
 
-      // AI returned a message but no real data → needs order number from user
+      // Backend returned a message but no return data → needs order number from user
       if (payload.chatMessage && payload.chatMessage.trim() !== "") {
         renderBotMessage(payload.chatMessage)
-        openOrderInput("Enter your order number...", (msg) => sendMessage(null, msg))
+        openOrderInput("Enter your order number...", (msg) =>
+          sendMessageWithIntent("RETURN_STATUS", msg, { orderNo: msg })
+        )
         return
       }
 
@@ -2197,6 +2152,7 @@
         </div>`
       chatBody.scrollTop = chatBody.scrollHeight
       renderBackToMenu()
+      enableInput("Type your message...")
     }
 
     // ─────────────────────────────────────────────────────────────────────────
