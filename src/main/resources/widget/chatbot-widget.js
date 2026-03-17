@@ -1138,7 +1138,7 @@
       trackOrders() {
         return this._post(
           "/chat",
-          { ...this._context(), message: "order track", question: "order track" },
+          { ...this._context(), message: "show my order history", question: "show my order history" },
           "Checking your orders...",
         )
       },
@@ -1716,7 +1716,7 @@
       const orderUrl =
         o.orderNo && o.orderNo.startsWith("http")
           ? o.orderNo
-          : `${window.location.origin}/my-account/order/${orderNumber}`
+          : `${window.location.origin}/in/en/my-account/order/${orderNumber}`
       const returnMsg = o.returnAllow ? "✅ Return Available" : "🚫 No Return"
       const exchangeMsg = o.exchangeAllow ? "♻️ Exchange Available" : "🚫 No Exchange"
       const statusBadge = o.latestStatus ? `<span class="order-status-badge">${o.latestStatus}</span>` : ""
@@ -2365,7 +2365,7 @@
             <div class="order-card-meta" style="color:#555;">Available store credit / wallet balance</div>
             ${walletUrl ? `
             <div class="order-card-actions" style="margin-top:8px;">
-              <a href="${walletUrl}" target="_blank" style="text-decoration:none;">
+              <a href="/in/en/my-account/my-credit" target="_blank" style="text-decoration:none;">
                 <button class="order-btn order-btn-primary">💳 View Wallet Details</button>
               </a>
             </div>` : ""}
