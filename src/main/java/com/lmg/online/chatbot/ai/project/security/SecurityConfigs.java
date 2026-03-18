@@ -73,19 +73,22 @@ public class SecurityConfigs {
 
             // Authorization rules
             .authorizeHttpRequests(auth -> auth
-                    // CORS preflight — browsers never send auth headers on OPTIONS
-                    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                    .requestMatchers(PUBLIC_PATHS).permitAll()
-                    .requestMatchers("/api/**").authenticated()
+                    // TODO: API key auth temporarily disabled — re-enable when Cloudflare
+                    //       Transform Rule is fixed or a non-header auth strategy is in place.
+                    //       Restore the lines below and uncomment addFilterBefore() to re-enable.
+                    //
+                    // .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                    // .requestMatchers(PUBLIC_PATHS).permitAll()
+                    // .requestMatchers("/api/**").authenticated()
                     .anyRequest().permitAll()
             )
 
             // Disable form login and HTTP Basic — API key is the only auth mechanism
             .formLogin(AbstractHttpConfigurer::disable)
-            .httpBasic(AbstractHttpConfigurer::disable)
+            .httpBasic(AbstractHttpConfigurer::disable);
 
-            // DB-backed API key filter runs before Spring's own auth filter
-            .addFilterBefore(apiKeyAuthFilter(), UsernamePasswordAuthenticationFilter.class);
+            // TODO: Re-enable API key filter once auth strategy is confirmed
+            // .addFilterBefore(apiKeyAuthFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

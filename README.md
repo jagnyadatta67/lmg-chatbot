@@ -205,6 +205,18 @@ mvn clean package
 java -jar target/loipl-0.0.1-SNAPSHOT.jar
 ```
 
+### Deploy Via Jump Server
+
+```bash
+# Build the jar
+./mvnw clean package
+
+# Deploy target/loipl-0.0.1-SNAPSHOT.jar using the configured jump/app hosts
+./scripts/deploy_via_jump.sh
+```
+
+The script can also take a custom jar path as its first argument, and all server/user/path values can be overridden with environment variables such as `JUMP_HOST`, `TARGET_HOST`, `JUMP_USER`, and `TARGET_JAR_DIR`.
+
 ### Docker (Optional)
 
 ```bash

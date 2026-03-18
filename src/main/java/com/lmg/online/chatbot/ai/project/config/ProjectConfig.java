@@ -5,14 +5,38 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.MediaType;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executor;
 
 @Configuration
 @EnableAsync
-public class ProjectConfig {
+public class ProjectConfig implements WebMvcConfigurer {
+
+    /**
+     * Extends Jackson's message converter to also accept text/plain bodies.
+     * This lets the widget POST with Content-Type: text/plain (a CORS simple
+     * request — no preflight) while sending a JSON string as the body.
+     * Cloudflare's broken OPTIONS rule is bypassed entirely this way.
+     */
+    @Override
+    public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
+        converters.stream()
+                .filter(c -> c instanceof MappingJackson2HttpMessageConverter)
+                .map(c -> (MappingJackson2HttpMessageConverter) c)
+                .forEach(c -> {
+                    List<MediaType> types = new ArrayList<>(c.getSupportedMediaTypes());
+                    types.add(MediaType.TEXT_PLAIN);
+                    c.setSupportedMediaTypes(types);
+                });
+    }
 
     @Bean
     public ObjectMapper objectMapper() {

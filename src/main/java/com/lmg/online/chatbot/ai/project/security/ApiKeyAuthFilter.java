@@ -58,6 +58,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
     /** Exact URIs that require NO API key. */
     private static final Set<String> PUBLIC_EXACT = Set.of(
             "/api/chat/health",
+            "/api/chat/menus",      // public — menu config, no auth needed
             "/",
             "/index.html",
             "/test-max.html",
@@ -108,6 +109,13 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                                     FilterChain         filterChain)
             throws ServletException, IOException {
 
+        // ── API KEY AUTH TEMPORARILY DISABLED ────────────────────────────────
+        // X-API-Key validation is commented out while CORS/Cloudflare issues
+        // are resolved. Re-enable by uncommenting the block below.
+        // TODO: re-enable API key auth before production go-live
+        filterChain.doFilter(request, response);
+
+        /*
         // CORS preflight — browsers never send auth headers on OPTIONS requests.
         // Pass through so Spring's CORS filter can respond with the correct headers.
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
@@ -147,6 +155,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                 client.getClientId(), request.getMethod(), request.getRequestURI());
 
         filterChain.doFilter(request, response);
+        */
     }
 
     // ----------------------------------------------------------------

@@ -853,9 +853,8 @@
       async _get(path, loaderMsg) {
         if (loaderMsg) showLoader(loaderMsg)
         try {
-          const res = await fetch(`${config.backend}${path}`, {
-            headers: { "X-API-Key": config.apikey },
-          })
+          // No custom headers → simple GET request → no CORS preflight
+          const res = await fetch(`${config.backend}${path}`)
           if (loaderMsg) hideLoader()
           if (!res.ok) throw new Error(`HTTP ${res.status}`)
           return { data: await res.json(), error: null }
@@ -876,9 +875,11 @@
       async _post(path, body, loaderMsg) {
         if (loaderMsg) showLoader(loaderMsg)
         try {
+          // Content-Type: text/plain → simple POST → no CORS preflight triggered
+          // Server accepts text/plain and parses body as JSON
           const res = await fetch(`${config.backend}${path}`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "X-API-Key": config.apikey },
+            headers: { "Content-Type": "text/plain" },
             body: JSON.stringify(body),
           })
           if (loaderMsg) hideLoader()
@@ -1143,7 +1144,7 @@
     const INTENT_HANDLERS = {
       POLICY_QUESTION:    handleGeneralIntent,
       GENERAL_QUERY:      handleGeneralIntent,
-      ORDER_TRACKING:     handleOrderTracking,
+      ORDER_TRACKING:     handleChatbotOrderList,
       CUSTOMER_PROFILE:   handleCustomerProfile,
       ORDER_LISTING:      handleChatbotOrderList,
       DELIVERY_TRACKING:  handleDeliveryTrackingResponse,

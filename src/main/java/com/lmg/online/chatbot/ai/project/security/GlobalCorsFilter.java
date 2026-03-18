@@ -47,12 +47,20 @@ public class GlobalCorsFilter extends OncePerRequestFilter {
 
         String origin = request.getHeader("Origin");
 
+        // Always strip any pre-existing CORS headers (prevents nginx duplicate headers)
+        response.setHeader("Access-Control-Allow-Origin",      null);
+        response.setHeader("Access-Control-Allow-Methods",     null);
+        response.setHeader("Access-Control-Allow-Headers",     null);
+        response.setHeader("Access-Control-Allow-Credentials", null);
+        response.setHeader("Access-Control-Max-Age",           null);
+        response.setHeader("Access-Control-Expose-Headers",    null);
+
         if (origin != null && isAllowedOrigin(origin)) {
             response.setHeader("Access-Control-Allow-Origin",  origin);
             response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
             response.setHeader("Access-Control-Allow-Headers", "X-API-Key, Content-Type, Authorization, Accept");
             response.setHeader("Access-Control-Max-Age",       "86400");
-            response.setHeader("Vary", "Origin");
+            response.setHeader("Vary",                         "Origin");
         }
 
         // Preflight — respond immediately, no need to reach Spring Security
