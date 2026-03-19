@@ -31,6 +31,10 @@ public class ChatbotOrderEntry {
     @JsonProperty("productCode")
     private String productCode;
 
+    /** Direct product name — populated by the chatbot-simplified endpoint */
+    @JsonProperty("productName")
+    private String productName;
+
     /** Direct image URL — populated by the chatbot-simplified endpoint */
     @JsonProperty("productImage")
     private String productImage;
@@ -85,6 +89,19 @@ public class ChatbotOrderEntry {
     }
 
     // ─── Derived helpers (used by widget serialisation) ───────────────────────
+
+    /**
+     * Returns the best available product name:
+     * 1. Direct "productName" from the chatbot endpoint
+     * 2. "product.name" from the standard Hybris API
+     */
+    public String getResolvedProductName() {
+        if (productName != null && !productName.isBlank()) return productName;
+        if (product != null && product.getName() != null && !product.getName().isBlank()) {
+            return product.getName();
+        }
+        return null;
+    }
 
     /**
      * Returns the best available product image URL:

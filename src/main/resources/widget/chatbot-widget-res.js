@@ -1704,101 +1704,116 @@
 
       // ── One card per item_detail ──────────────────────────────────────────
       items.forEach(item => {
-        const cons = item.consignment || {}
-        const ret  = item.returnDetail || null
+        const cons  = item.consignment  || null   // null = not yet shipped
+        const ret   = item.returnDetail || null   // null = no return initiated
 
-        // ── Alerts ──────────────────────────────────────────────────────────
-        const tatAlert = cons.deliveryTatBreached
-          ? `<div class="entry-tat-alert">
-               ⚠️ Delivery exceeded the promised timeframe — we're looking into this for you.
-             </div>`
-          : ""
-        const dispatchAlert = cons.dispatchDelayed
-          ? `<div class="entry-tat-alert">
-               ⏳ Dispatch is running later than expected. We'll update you soon.
-             </div>`
-          : ""
+        const hasCons = !!(cons && cons.consignmentCode)
+        const hasRet  = !!(ret  && ret.returnInitiated)
 
-        // ── Consignment section ──────────────────────────────────────────────
-        const shippedFmt  = cons.shippedDate         ? new Date(cons.shippedDate).toLocaleString()         : null
-        const delivFmt    = cons.actualDeliveryDate   ? new Date(cons.actualDeliveryDate).toLocaleString()  : null
-        const consSection = `
-          <div class="entry-section">
-            <div class="entry-section-title">📦 Consignment</div>
-            ${cons.consignmentCode  ? `<div class="entry-detail-row"><span>Tracking #</span><b>${cons.consignmentCode}</b></div>` : ""}
-            <div class="entry-detail-row"><span>Status</span><b>${cons.consignmentStatus || item.status || "—"}</b></div>
-            ${shippedFmt            ? `<div class="entry-detail-row"><span>Shipped</span><b>${shippedFmt}</b></div>` : ""}
-            ${delivFmt              ? `<div class="entry-detail-row"><span>Delivered</span><b>${delivFmt}</b></div>` : ""}
-            <div class="entry-detail-row"><span>Qty Shipped</span><b>${cons.quantityShipped ?? item.quantity ?? "—"}</b></div>
-            <div class="entry-detail-row">
-              <span>Return Window</span>
-              <b style="color:${cons.returnWindowExpired ? '#e53935' : '#43a047'}">
-                ${cons.returnWindowExpired ? "Expired" : "Open"}
-              </b>
+        // Product header — shared across all three cases
+        const header = `
+          <div class="entry-product-header">
+            ${productLink}
+            <div>
+              ${productName ? `<div class="entry-product-name">${productName}</div>` : ""}
+              ${productCode}
+              ${orderCodeHtml}
             </div>
           </div>`
 
-        // ── Return section (only when a return exists) ───────────────────────
-        let returnSection = ""
-        if (ret) {
-          const retDateFmt     = ret.returnCreationDate ? new Date(ret.returnCreationDate).toLocaleDateString() : null
-          const pickupDelayMsg = ret.returnPickupDelayed
-            ? `<div class="entry-tat-alert pickup">
-                 ⚠️ Your return pickup is delayed. Please allow approximately <b>2 more days</b> — we apologise for the inconvenience.
-               </div>`
-            : ""
-          const faqHtml = ret.faqLink
-            ? `<div class="entry-detail-row"><span>FAQ</span>
-                 <a href="${ret.faqLink}" target="_blank" class="entry-faq-link">📋 Return Help</a>
-               </div>`
-            : ""
-
-          // "Return Status" button — triggers RETURN_STATUS_DETAIL via event delegation
-          const returnStatusBtn = ret.rma
-            ? `<div style="margin-top:10px;">
-                 <button class="order-btn order-btn-detail"
-                   data-intent="RETURN_STATUS_DETAIL"
-                   data-order-no="${payload.orderNo}"
-                   data-rma-no="${ret.rma}">
-                   ↩️ Return Status
-                 </button>
-               </div>`
-            : ""
-
-          returnSection = `
-            <div class="entry-section">
-              <div class="entry-section-title">🔄 Return Details</div>
-              ${ret.returnId      ? `<div class="entry-detail-row"><span>Return ID</span><b>${ret.returnId}</b></div>` : ""}
-              ${ret.rma           ? `<div class="entry-detail-row"><span>RMA #</span><b>${ret.rma}</b></div>` : ""}
-              ${ret.returnStatus  ? `<div class="entry-detail-row"><span>Status</span><b>${ret.returnStatus}</b></div>` : ""}
-              ${retDateFmt        ? `<div class="entry-detail-row"><span>Raised On</span><b>${retDateFmt}</b></div>` : ""}
-              ${pickupDelayMsg}
-              ${faqHtml}
-              ${returnStatusBtn}
-            </div>`
-        }
-
-        // ── Eligibility footer ───────────────────────────────────────────────
+        // Eligibility footer — always shown
         const eligibility = `
           <div class="entry-eligibility">
-            <span>${payload.returnable    ? "✅ Returnable"    : "❌ Not Returnable"}</span>
-            <span>${payload.exchangeable  ? "✅ Exchangeable"  : "❌ Not Exchangeable"}</span>
+            <span>${payload.returnable   ? "✅ Returnable"   : "❌ Not Returnable"}</span>
+            <span>${payload.exchangeable ? "✅ Exchangeable" : "❌ Not Exchangeable"}</span>
           </div>`
+
+        // ─── CASE 1: No consignment — order placed, not yet shipped ──────────
+        if (!hasCons && !hasRet) {
+          chatBody.innerHTML += `
+            <div class="entry-detail-card">
+              ${header}
+              <div class="entry-section">
+                <div class="entry-detail-row"><span>Status</span><b>${item.status || "—"}</b></div>
+                <div class="entry-detail-row"><span>Qty</span><b>${item.quantity || 1}</b></div>
+              </div>
+              ${eligibility}
+            </div>`
+          chatBody.scrollTop = chatBody.scrollHeight
+          return
+        }
+
+        // ─── CASE 2: Consignment only — shipped/delivered, no return ─────────
+        if (hasCons && !hasRet) {
+          const shippedFmt = cons.shippedDate        ? new Date(cons.shippedDate).toLocaleDateString("en-IN")        : null
+          const delivFmt   = cons.actualDeliveryDate ? new Date(cons.actualDeliveryDate).toLocaleDateString("en-IN") : null
+
+          const tatAlert  = cons.deliveryTatBreached
+            ? `<div class="entry-tat-alert">⚠️ Delivery exceeded the promised timeframe — please contact support.</div>` : ""
+          const dispAlert = cons.dispatchDelayed
+            ? `<div class="entry-tat-alert">⏳ Dispatch is running later than expected. We'll update you soon.</div>` : ""
+
+          chatBody.innerHTML += `
+            <div class="entry-detail-card">
+              ${header}
+              ${tatAlert}${dispAlert}
+              <div class="entry-section">
+                <div class="entry-section-title">📦 Consignment</div>
+                <div class="entry-detail-row"><span>Status</span><b>${cons.consignmentStatus || item.status || "—"}</b></div>
+                ${cons.consignmentCode ? `<div class="entry-detail-row"><span>Tracking #</span><b>${cons.consignmentCode}</b></div>` : ""}
+                ${shippedFmt          ? `<div class="entry-detail-row"><span>Shipped</span><b>${shippedFmt}</b></div>`              : ""}
+                ${delivFmt            ? `<div class="entry-detail-row"><span>Delivered</span><b>${delivFmt}</b></div>`              : ""}
+                <div class="entry-detail-row"><span>Qty Shipped</span><b>${cons.quantityShipped ?? item.quantity ?? "—"}</b></div>
+                <div class="entry-detail-row">
+                  <span>Return Window</span>
+                  <b style="color:${cons.returnWindowExpired ? '#e53935' : '#43a047'}">
+                    ${cons.returnWindowExpired ? "Expired" : "Open"}
+                  </b>
+                </div>
+              </div>
+              ${eligibility}
+            </div>`
+          chatBody.scrollTop = chatBody.scrollHeight
+          return
+        }
+
+        // ─── CASE 3: Consignment + returnDetail — return initiated ────────────
+        // Delivery context shown briefly; return section is the main focus.
+        // Alerts: returnPickupDelayed first (most prominent), then tatBreached.
+        const pickupAlert = ret.returnPickupDelayed
+          ? `<div class="entry-tat-alert pickup">⚠️ Return pickup is delayed — allow approximately <b>2 more days</b>. We apologise for the inconvenience.</div>`
+          : ""
+        const tatAlert = cons && cons.deliveryTatBreached
+          ? `<div class="entry-tat-alert">⚠️ Delivery exceeded the promised timeframe.</div>`
+          : ""
+
+        const retDateFmt = ret.returnCreationDate
+          ? new Date(ret.returnCreationDate).toLocaleDateString("en-IN") : null
+
+        const faqHtml = ret.faqLink
+          ? `<div class="entry-detail-row"><span>FAQ</span><a href="${ret.faqLink}" target="_blank" class="entry-faq-link">📋 Return Help</a></div>`
+          : ""
 
         chatBody.innerHTML += `
           <div class="entry-detail-card">
-            <div class="entry-product-header">
-              ${productLink}
-              <div>
-                ${productName ? `<div class="entry-product-name">${productName}</div>` : ""}
-                ${productCode}
-                ${orderCodeHtml}
-              </div>
-            </div>
+            ${header}
+            ${pickupAlert}
             ${tatAlert}
-            ${dispatchAlert}
-            ${consSection}
-            ${returnSection}
+            <div class="entry-section">
+              <div class="entry-detail-row">
+                <span>Delivery Status</span>
+                <b>${cons ? (cons.consignmentStatus || item.status || "—") : (item.status || "—")}</b>
+              </div>
+              ${cons && cons.consignmentCode ? `<div class="entry-detail-row"><span>Tracking #</span><b>${cons.consignmentCode}</b></div>` : ""}
+            </div>
+            <div class="entry-section">
+              <div class="entry-section-title">🔄 Return Details</div>
+              ${ret.returnStatus ? `<div class="entry-detail-row"><span>Return Status</span><b>${ret.returnStatus}</b></div>` : ""}
+              ${ret.returnId     ? `<div class="entry-detail-row"><span>Return ID</span><b>${ret.returnId}</b></div>`         : ""}
+              ${ret.rma          ? `<div class="entry-detail-row"><span>RMA #</span><b>${ret.rma}</b></div>`                  : ""}
+              ${retDateFmt       ? `<div class="entry-detail-row"><span>Raised On</span><b>${retDateFmt}</b></div>`           : ""}
+              ${faqHtml}
+            </div>
             ${eligibility}
           </div>`
 
@@ -2391,6 +2406,7 @@
       const img    = entry.resolvedProductImage || entry.productImage || null
       const relUrl = entry.resolvedProductUrl   || entry.productUrl   || null
       const productUrl = relUrl ? `${window.location.origin}${relUrl}` : null
+      const name   = entry.resolvedProductName  || entry.productName  || null
       const code   = entry.productCode || "—"
       const qty    = entry.quantity    || 1
       const pk     = entry.orderEntryPk || ""
@@ -2401,10 +2417,14 @@
                onerror="this.style.display='none'">`
         : `<div style="width:44px;height:44px;background:#f0f0f0;border-radius:6px;flex-shrink:0;"></div>`
 
+      const nameHtml = name
+        ? `<div style="font-weight:600;font-size:0.82em;color:#222;line-height:1.3;">${name}</div>`
+        : ""
+
       const codeHtml = productUrl
         ? `<a href="${productUrl}" target="_blank"
-              style="font-weight:600;font-size:0.82em;color:#c8972b;text-decoration:none;">${code}</a>`
-        : `<span style="font-weight:600;font-size:0.82em;">${code}</span>`
+              style="font-size:0.75em;color:#c8972b;text-decoration:none;">${code}</a>`
+        : `<span style="font-size:0.75em;color:#888;">${code}</span>`
 
       const returnBadge = entry.returnable
         ? `<span style="color:#43a047;font-size:0.75em;">✅ Returnable</span>`
@@ -2424,6 +2444,7 @@
         <div class="order-entry-row">
           ${imgHtml}
           <div style="flex:1;min-width:0;">
+            ${nameHtml}
             ${codeHtml}
             <div style="font-size:0.78em;color:#666;margin-top:2px;">Qty: ${qty}</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">

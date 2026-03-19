@@ -645,9 +645,26 @@
       .order-product-meta {
         font-size: 11px; color: #444; line-height: 1.6; flex: 1;
       }
-      .order-card-actions {
-        display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;
+      .order-entry-row {
+        display: flex; align-items: flex-start; gap: 10px;
+        padding: 9px 0; border-top: 1px solid #e8e8e8;
       }
+      .order-entries-wrapper {
+        margin-top: 6px; border-bottom: 1px solid #e0e0e0; padding-bottom: 2px;
+      }
+      .order-card-actions {
+        display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
+        justify-content: flex-end;
+      }
+      .order-btn-more {
+        background: white; border: 1.5px solid #1a1a1a; color: #1a1a1a;
+        font-size: 11px; padding: 5px 10px; border-radius: 8px; cursor: pointer;
+        font-weight: 600; transition: all .18s; align-self: center;
+        white-space: nowrap; flex-shrink: 0;
+      }
+      .order-btn-more:hover { background: #1a1a1a12; }
+      .order-btn-detail { background: linear-gradient(135deg, ${theme.primary}, ${theme.secondary}); color: white; }
+      .order-btn-detail:hover { opacity: 0.88; transform: translateY(-1px); }
       .order-btn {
         padding: 8px 12px;
         border: none; border-radius: 8px;
@@ -1191,6 +1208,7 @@
       POLICY_QUESTION:    handleGeneralIntent,
       GENERAL_QUERY:      handleGeneralIntent,
       ORDER_TRACKING:     handleOrderTracking,
+      ORDER_ENTRY_INTENT: handleOrderEntryDetail,
       CANCEL_OR_RETURN:   handleCancelOrReturn,
       CUSTOMER_PROFILE:   handleCustomerProfile,
       ORDER_LISTING:      handleChatbotOrderList,
@@ -1361,65 +1379,110 @@
 
 
     /**
-     * Shared helper — renders a single-order detail card into the chat body.
-     * Accepts an OrderResponse payload (or any object with orderDetailsList[]).
-     * Returns true if a card was rendered, false if orderDetailsList was empty.
+     * Renders one order entry row — shared by ORDER_TRACKING and ORDER_LISTING cards.
+     * Shows product image, code (clickable), qty, return/exchange badges, More Details btn.
      */
-    function renderSingleOrderCard(orderData) {
-      const items = Array.isArray(orderData?.orderDetailsList) ? orderData.orderDetailsList : []
-      if (items.length === 0) return false
+    function renderOrderEntryRow(entry, orderNo) {
+      const img    = entry.resolvedProductImage || entry.productImage || null
+      const relUrl = entry.resolvedProductUrl   || entry.productUrl   || null
+      const productUrl = relUrl ? `${window.location.origin}${relUrl}` : null
+      const name   = entry.resolvedProductName  || entry.productName  || null
+      const code   = entry.productCode || "—"
+      const qty    = entry.quantity    || 1
+      const pk     = entry.orderEntryPk || ""
 
-      const first    = items[0]
-      const orderNo  = first.orderNo     || "N/A"
-      const status   = first.orderStatus || "Unknown"
-      const rawDate  = first.orderDate
-      const date     = rawDate ? new Date(rawDate).toLocaleDateString() : "N/A"
-      const amount   = first.netAmount   || (first.orderAmount != null ? `₹${first.orderAmount}` : "N/A")
+      const imgHtml = img
+        ? `<img src="${img}" alt="Product" class="order-product-thumb"
+               style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;"
+               onerror="this.style.display='none'">`
+        : `<div style="width:44px;height:44px;background:#f0f0f0;border-radius:6px;flex-shrink:0;"></div>`
+
+      const nameHtml = name
+        ? `<div style="font-weight:600;font-size:0.82em;color:#222;line-height:1.3;">${name}</div>`
+        : ""
+
+      const codeHtml = productUrl
+        ? `<a href="${productUrl}" target="_blank"
+              style="font-size:0.75em;color:#c8972b;text-decoration:none;">${code}</a>`
+        : `<span style="font-size:0.75em;color:#888;">${code}</span>`
+
+      const returnBadge = entry.returnable
+        ? `<span style="color:#43a047;font-size:0.75em;">✅ Returnable</span>`
+        : `<span style="color:#9e9e9e;font-size:0.75em;">❌ Not Returnable</span>`
+      const exchBadge = entry.exchangeable
+        ? `<span style="color:#43a047;font-size:0.75em;">✅ Exchangeable</span>`
+        : `<span style="color:#9e9e9e;font-size:0.75em;">❌ Not Exchangeable</span>`
+
+      const moreBtn = pk
+        ? `<button class="order-btn order-btn-more"
+              data-intent="ORDER_ENTRY_INTENT"
+              data-order-no="${orderNo}"
+              data-entry-pk="${pk}">🔍 More Details</button>`
+        : ""
+
+      return `
+        <div class="order-entry-row">
+          ${imgHtml}
+          <div style="flex:1;min-width:0;">
+            ${nameHtml}
+            ${codeHtml}
+            <div style="font-size:0.78em;color:#666;margin-top:2px;">Qty: ${qty}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+              ${returnBadge}
+              ${exchBadge}
+            </div>
+          </div>
+          ${moreBtn}
+        </div>`
+    }
+
+    /**
+     * Shared helper — renders a single-order detail card into the chat body.
+     * Accepts a single OrderSummary object: { orderNo, orderStatus, orderDate,
+     * orderAmount, numberOfShipments, numberOfProductsDelivered, entries[] }
+     * Returns true if a card was rendered, false if entries were empty.
+     */
+    function renderSingleOrderCard(order) {
+      const entries = Array.isArray(order?.entries) ? order.entries : []
+      if (entries.length === 0) return false
+
+      const orderNo  = order.orderNo     || "N/A"
+      const status   = order.orderStatus || order.statusDisplay || order.status || ""
+      const date     = order.orderDate   ? new Date(order.orderDate).toLocaleDateString("en-IN") : "N/A"
+      const amount   = order.orderAmount != null
+        ? `₹ ${Number(order.orderAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+        : "N/A"
       const orderUrl = `${window.location.origin}/in/en/my-account/order/${orderNo}`
 
-      // Product rows — one per orderDetailsList entry
-      const productRowsHtml = items.map(item => {
-        const img = item.imageURL
-          ? `<a href="${item.productURL || orderUrl}" target="_blank">` +
-              `<img src="${item.imageURL}" alt="${item.productName || 'Product'}" ` +
-                   `class="order-product-thumb" onerror="this.style.display='none'">` +
-            `</a>`
-          : ""
-        const meta = [
-          item.productName  ? `<b>${item.productName}</b>`                                        : null,
-          item.qty          ? `Qty: ${item.qty}`                                                   : null,
-          item.color        ? `Color: ${item.color}`                                               : null,
-          item.size         ? `Size: ${item.size}`                                                 : null,
-          item.netAmount    ? `Amount: ${item.netAmount}`                                          : null,
-          item.latestStatus ? `Status: ${item.latestStatus}`                                       : null,
-          item.estmtDate    ? `Est. Delivery: ${new Date(item.estmtDate).toLocaleDateString()}`    : null,
-        ].filter(Boolean).join(" &nbsp;·&nbsp; ")
-        return `<div class="order-product-row">${img}<div class="order-product-meta">${meta}</div></div>`
-      }).join("")
+      const ships     = order.numberOfShipments
+      const delivered = order.numberOfProductsDelivered
+      const shipmentLine = (ships != null && delivered != null)
+        ? `<div class="order-card-meta" style="color:#555;font-size:0.85em;">
+             📦 ${ships} shipment${ships !== 1 ? "s" : ""}
+             &nbsp;·&nbsp;
+             ${delivered} item${delivered !== 1 ? "s" : ""} delivered
+           </div>`
+        : ""
 
-      const canReturn   = items.some(i => i.returnAllow)
-      const canExchange = items.some(i => i.exchangeAllow)
-      const actionsNote = [
-        canReturn   ? "✅ Return eligible"   : "❌ Return not available",
-        canExchange ? "✅ Exchange eligible" : "❌ Exchange not available",
-      ].join(" &nbsp;&nbsp; ")
+      const entriesHtml = entries.map(e => renderOrderEntryRow(e, orderNo)).join("")
 
       chatBody.innerHTML += `
         <div class="order-card">
           <div class="order-card-content">
             <div class="order-card-header">
               <div class="order-card-title">Order #${orderNo}</div>
-              <span class="order-status-badge">${status}</span>
+              ${status ? `<span class="order-status-badge">${status}</span>` : ""}
             </div>
-            <div class="order-card-meta"><strong>Date:</strong> ${date}</div>
-            <div class="order-card-meta"><strong>Amount:</strong> ${amount}</div>
-            <div class="order-products-detail">${productRowsHtml}</div>
-            <div class="order-card-meta order-return-note" style="font-size:0.82em;color:#666;">${actionsNote}</div>
+            <div class="order-card-meta">
+              <strong>Date:</strong> ${date} &nbsp;·&nbsp; <strong>Amount:</strong> ${amount}
+            </div>
+            ${shipmentLine}
+            <div class="order-entries-wrapper">${entriesHtml}</div>
             <div class="order-card-actions">
+              <button class="order-btn order-btn-secondary" style="font-size:11px;padding:5px 10px;min-height:30px;" onclick="copyToClipboard('${orderNo}')">Copy #</button>
               <a href="${orderUrl}" target="_blank" style="text-decoration:none;">
-                <button class="order-btn order-btn-primary">View Order</button>
+                <button class="order-btn order-btn-detail" style="font-size:11px;padding:5px 10px;">View Details ↗</button>
               </a>
-              <button class="order-btn order-btn-secondary" onclick="copyToClipboard('${orderNo}')">Copy #</button>
             </div>
           </div>
         </div>`
@@ -1429,8 +1492,8 @@
     }
 
     /**
-     * Renders the OrderResponse returned by ORDER_TRACKING intent.
-     * Shape: { chat_message, needsOrderNumber, orderDetailsList[] }
+     * Renders the ORDER_TRACKING response.
+     * Shape: { chat_message, needsOrderNumber, orders: [{ orderNo, orderStatus, ... entries[] }] }
      */
     function handleOrderTracking(payload) {
       if (checkAndTriggerLogin(payload, "Please sign in to track your orders.")) return
@@ -1452,7 +1515,9 @@
         return
       }
 
-      const rendered = renderSingleOrderCard(payload)
+      const orders  = Array.isArray(payload.orders) ? payload.orders : []
+      const order   = orders[0]
+      const rendered = order ? renderSingleOrderCard(order) : false
       if (!rendered) {
         renderBotMessage("📦 No order details found. Please check the order number and try again.")
       }
@@ -2269,6 +2334,120 @@
             ${payload.faqLink ? `<div class="order-card-meta"><a href="${payload.faqLink}" target="_blank" style="color:${theme.primary};font-weight:600;">📖 Return FAQ</a></div>` : ""}
           </div>
         </div>`
+      chatBody.scrollTop = chatBody.scrollHeight
+      renderBackToMenu()
+      enableInput("Type your message...")
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ORDER ENTRY DETAIL  (response renderer for "🔍 More Details" button)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Renders the OrderEntryDetailResponse returned by ORDER_ENTRY_INTENT.
+     * Shape: { productName, productCode, productImageUrl, productUrl,
+     *          orderNo, orderEntryPk, returnable, exchangeable,
+     *          item_details: [{ position, quantity, status,
+     *            consignment: { consignmentCode, consignmentStatus, shippedDate,
+     *                           actualDeliveryDate, deliveryTatBreached, dispatchDelayed },
+     *            returnDetail: { returnId, rma, returnStatus, returnCreationDate,
+     *                            returnPickupDelayed, returnInitiated, faqLink } }] }
+     */
+    function handleOrderEntryDetail(payload) {
+      if (payload.chat_message && payload.chat_message.trim() !== "") {
+        renderBotMessage(payload.chat_message)
+        renderBackToMenu()
+        enableInput("Type your message...")
+        return
+      }
+
+      const orderNo    = payload.orderNo    || "N/A"
+      const name       = payload.productName || null
+      const code       = payload.productCode || "—"
+      const imgUrl     = payload.productImageUrl || null
+      const relUrl     = payload.productUrl  || null
+      const productUrl = relUrl ? `${window.location.origin}${relUrl}` : null
+
+      const imgHtml = imgUrl
+        ? `<img src="${imgUrl}" alt="Product"
+               style="width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid #eee;"
+               onerror="this.style.display='none'">`
+        : ""
+
+      const nameHtml = name
+        ? `<div style="font-weight:700;font-size:0.88em;color:#222;line-height:1.35;">${name}</div>`
+        : ""
+
+      const codeHtml = productUrl
+        ? `<a href="${productUrl}" target="_blank"
+              style="font-size:0.76em;color:#c8972b;text-decoration:none;">${code}</a>`
+        : `<span style="font-size:0.76em;color:#888;">${code}</span>`
+
+      const returnBadge = payload.returnable
+        ? `<span style="color:#43a047;font-size:0.76em;">✅ Returnable</span>`
+        : `<span style="color:#9e9e9e;font-size:0.76em;">❌ Not Returnable</span>`
+      const exchBadge = payload.exchangeable
+        ? `<span style="color:#43a047;font-size:0.76em;">✅ Exchangeable</span>`
+        : `<span style="color:#9e9e9e;font-size:0.76em;">❌ Not Exchangeable</span>`
+
+      const items = Array.isArray(payload.item_details) ? payload.item_details : []
+
+      const itemsHtml = items.map(item => {
+        const c = item.consignment || {}
+        const r = item.returnDetail || {}
+
+        const status   = c.consignmentStatus || item.status || ""
+        const shipped  = c.shippedDate         ? `<div class="order-card-meta"><strong>Shipped:</strong> ${new Date(c.shippedDate).toLocaleDateString("en-IN")}</div>` : ""
+        const eta      = c.actualDeliveryDate  ? `<div class="order-card-meta"><strong>ETA:</strong> ${new Date(c.actualDeliveryDate).toLocaleDateString("en-IN")}</div>` : ""
+        const tracking = c.consignmentCode     ? `<div class="order-card-meta"><strong>Tracking #:</strong> ${c.consignmentCode}</div>` : ""
+        const tatAlert = c.deliveryTatBreached ? `<div class="order-card-meta" style="color:#e53935;font-size:0.8em;">⚠️ Delivery SLA breached — please contact support.</div>` : ""
+        const dispAlert = c.dispatchDelayed    ? `<div class="order-card-meta" style="color:#f57c00;font-size:0.8em;">⚠️ Dispatch is running late. Please allow extra time.</div>` : ""
+
+        let returnHtml = ""
+        if (r.returnInitiated) {
+          const rDate   = r.returnCreationDate ? new Date(r.returnCreationDate).toLocaleDateString("en-IN") : "N/A"
+          const rAlert  = r.returnPickupDelayed ? `<div class="order-card-meta" style="color:#f57c00;font-size:0.8em;">⚠️ Return pickup delayed — allow ~2 extra days.</div>` : ""
+          returnHtml = `
+            <div style="margin-top:6px;padding-top:6px;border-top:1px dashed #e0e0e0;">
+              <div class="order-card-meta" style="font-weight:600;color:#555;">↩️ Return Info</div>
+              ${r.returnStatus ? `<div class="order-card-meta"><strong>Return Status:</strong> ${r.returnStatus}</div>` : ""}
+              ${r.returnId     ? `<div class="order-card-meta"><strong>Return ID:</strong> ${r.returnId}</div>` : ""}
+              ${r.rma          ? `<div class="order-card-meta"><strong>RMA:</strong> ${r.rma}</div>` : ""}
+              <div class="order-card-meta"><strong>Raised On:</strong> ${rDate}</div>
+              ${rAlert}
+              ${r.faqLink ? `<div class="order-card-meta"><a href="${r.faqLink}" target="_blank" style="color:${theme.primary};font-weight:600;font-size:0.82em;">📖 Return FAQ</a></div>` : ""}
+            </div>`
+        }
+
+        return `
+          <div style="padding:8px 0;border-top:1px solid #f0f0f0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div style="font-size:0.8em;color:#555;">Qty: ${item.quantity || 1}</div>
+              ${status ? `<span class="order-status-badge">${status}</span>` : ""}
+            </div>
+            ${tracking}${shipped}${eta}${tatAlert}${dispAlert}${returnHtml}
+          </div>`
+      }).join("")
+
+      chatBody.innerHTML += `
+        <div class="order-card">
+          <div class="order-card-content">
+            <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;">
+              ${imgHtml}
+              <div style="flex:1;min-width:0;">
+                ${nameHtml}
+                ${codeHtml}
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+                  ${returnBadge}
+                  ${exchBadge}
+                </div>
+              </div>
+            </div>
+            <div class="order-card-meta" style="font-size:0.78em;color:#888;">Order #${orderNo}</div>
+            ${itemsHtml}
+          </div>
+        </div>`
+
       chatBody.scrollTop = chatBody.scrollHeight
       renderBackToMenu()
       enableInput("Type your message...")

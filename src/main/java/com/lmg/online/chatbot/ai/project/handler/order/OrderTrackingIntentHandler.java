@@ -7,24 +7,29 @@ import com.lmg.online.chatbot.ai.project.handler.IntentHandler;
 import com.lmg.online.chatbot.ai.request.ChatRequest;
 import com.lmg.online.chatbot.ai.tools.order.OrderTrackingTool;
 import com.lmg.online.chatbot.ai.tools.order.dto.ChatbotOrderTrackingResponse;
+import com.lmg.online.chatbot.ai.tools.order.dto.HybrisSingleOrderResponse;
 import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
- * Handles ORDER_TRACKING intent — fetches a single order's details by order number.
+ * Handles ORDER_TRACKING intent — fetches a single order's full details by order number.
  *
  * Flow (no AI involved):
  *   1. Auth guard — userId must be present
  *   2. Extract order number from request.orderNo or via regex from message text
  *   3. No order number → return friendly ask message immediately
- *   4. Call OrderTrackingTool → chatbot REST API → ChatbotOrderTrackingResponse
- *   5. Return ChatbotResponse directly (no mapper needed — new API maps cleanly)
+ *   4. Call OrderTrackingTool → Hybris order API → HybrisSingleOrderResponse
+ *   5. Map HybrisSingleOrderResponse → ChatbotOrderTrackingResponse (single order in orders[0])
+ *   6. Return ChatbotResponse directly
  */
 @Slf4j
 @Component
@@ -99,8 +104,8 @@ public class OrderTrackingIntentHandler implements IntentHandler<ChatbotOrderTra
 
         log.info("🔢 Order number: {}", orderNo);
 
-        // 3. Fetch from chatbot API (pure REST, no AI, no mapper)
-        ChatbotOrderTrackingResponse data = orderTrackingTool.getSingleOrderDetails(
+        // 3. Fetch from Hybris API (pure REST, no AI)
+        HybrisSingleOrderResponse hybrisData = orderTrackingTool.getSingleOrderDetails(
                 request.getUserId(),
                 request.getAccessToken(),
                 orderNo,
@@ -110,7 +115,7 @@ public class OrderTrackingIntentHandler implements IntentHandler<ChatbotOrderTra
         );
 
         // 4. Handle null response (API error)
-        if (data == null) {
+        if (hybrisData == null) {
             ChatbotOrderTrackingResponse errorResp = new ChatbotOrderTrackingResponse();
             errorResp.setChatMessage("Unable to fetch order details right now. "
                     + ConceptBaseUrlResolver.getPhoneNumber(request.getConcept()));
@@ -118,13 +123,27 @@ public class OrderTrackingIntentHandler implements IntentHandler<ChatbotOrderTra
             return buildResponse(errorResp, request, startTime);
         }
 
-        // 5. Handle empty orders list
+        // 5. Map Hybris response → widget-ready DTO
+        ChatbotOrderTrackingResponse data;
+        try {
+            data = mapToTrackingResponse(hybrisData, request.getConcept(), request.getEnv());
+        } catch (Exception e) {
+            log.error("❌ Failed to map Hybris order response for orderNo={}", orderNo, e);
+            ChatbotOrderTrackingResponse errorResp = new ChatbotOrderTrackingResponse();
+            errorResp.setChatMessage("Unable to process order details right now. "
+                    + ConceptBaseUrlResolver.getPhoneNumber(request.getConcept()));
+            errorResp.setOrders(Collections.emptyList());
+            return buildResponse(errorResp, request, startTime);
+        }
+
+        // 6. Handle empty / unrecognised order
         if (data.getOrders() == null || data.getOrders().isEmpty()) {
             data.setChatMessage("No order found for order number " + orderNo + ". Please check and try again.");
             data.setOrders(Collections.emptyList());
         }
 
-        log.info("✅ Returning {} order(s) for orderNo={}", data.getOrders().size(), orderNo);
+        log.info("✅ Returning order={} status={}", orderNo,
+                data.getOrders().isEmpty() ? "none" : data.getOrders().get(0).getOrderStatus());
 
         return buildResponse(data, request, startTime);
     }
@@ -137,6 +156,116 @@ public class OrderTrackingIntentHandler implements IntentHandler<ChatbotOrderTra
     @Override
     public boolean canHandle(String query) {
         return ORDER_PATTERN.matcher(query).matches();
+    }
+
+    // ── Mapping ───────────────────────────────────────────────────────────────
+
+    /**
+     * Maps a raw {@link HybrisSingleOrderResponse} into the widget-ready
+     * {@link ChatbotOrderTrackingResponse}, wrapping the single order in {@code orders[0]}.
+     *
+     * Field mappings:
+     *   code            → orderNo
+     *   statusDisplay   → orderStatus  (fallback: status)
+     *   created         → orderDate
+     *   totalPrice.value → orderAmount
+     *   entries[]       → OrderEntry[] (see per-entry mapping below)
+     *
+     * Per-entry:
+     *   entryNumber          → position
+     *   orderEntryPk         → orderEntryPk
+     *   quantity             → quantity
+     *   returnEligible       → returnable
+     *   exchangeEnabled      → exchangeable
+     *   product.code         → productCode
+     *   product.url          → productUrl
+     *   product.images[0].url → productImage  (resolved to absolute URL if relative)
+     */
+    private ChatbotOrderTrackingResponse mapToTrackingResponse(
+            HybrisSingleOrderResponse hybris, String concept, String env) {
+
+        ChatbotOrderTrackingResponse response = new ChatbotOrderTrackingResponse();
+
+        if (hybris.getCode() == null || hybris.getCode().isBlank()) {
+            // API returned something but without a valid order code
+            return response;
+        }
+
+        ChatbotOrderTrackingResponse.OrderSummary summary = new ChatbotOrderTrackingResponse.OrderSummary();
+        summary.setOrderNo(hybris.getCode());
+        summary.setOrderStatus(
+                hybris.getStatusDisplay() != null ? hybris.getStatusDisplay() : hybris.getStatus());
+        summary.setOrderDate(hybris.getCreated());
+        summary.setOrderAmount(hybris.getTotalPrice() != null ? hybris.getTotalPrice().getValue() : null);
+
+        List<HybrisSingleOrderResponse.HybrisEntry> hybrisEntries =
+                hybris.getEntries() != null ? hybris.getEntries() : Collections.emptyList();
+
+        // Count distinct active consignment codes → number of shipments
+        long shipments = hybrisEntries.stream()
+                .map(HybrisSingleOrderResponse.HybrisEntry::getConsignmentStatus)
+                .filter(Objects::nonNull)
+                .map(HybrisSingleOrderResponse.HybrisEntry.ConsignmentStatusData::getConsignmentCode)
+                .filter(c -> c != null && !c.isBlank())
+                .distinct()
+                .count();
+        summary.setNumberOfShipments((int) shipments);
+
+        // Count entries whose last consignment history event indicates delivery
+        long delivered = hybrisEntries.stream()
+                .filter(e -> {
+                    if (e.getConsignmentStatus() == null) return false;
+                    List<HybrisSingleOrderResponse.HybrisEntry.ConsignmentStatusData.ConsignmentHistory> hist =
+                            e.getConsignmentStatus().getConsignmentHistoryData();
+                    if (hist == null || hist.isEmpty()) return false;
+                    String lastStatus = hist.get(hist.size() - 1).getStatus();
+                    return lastStatus != null && lastStatus.toUpperCase().contains("DELIVER");
+                })
+                .count();
+        summary.setNumberOfProductsDelivered((int) delivered);
+
+        // Map entries
+        List<ChatbotOrderTrackingResponse.OrderEntry> entries = hybrisEntries.stream()
+                .map(he -> {
+                    ChatbotOrderTrackingResponse.OrderEntry entry =
+                            new ChatbotOrderTrackingResponse.OrderEntry();
+
+                    if (he.getEntryNumber() != null) entry.setPosition(he.getEntryNumber());
+                    entry.setOrderEntryPk(he.getOrderEntryPk());
+                    entry.setQuantity(he.getQuantity() != null ? he.getQuantity() : 1);
+                    entry.setReturnable(he.isReturnEligible());
+                    entry.setExchangeable(he.isExchangeEnabled());
+
+                    HybrisSingleOrderResponse.HybrisEntry.HybrisProduct product = he.getProduct();
+                    if (product != null) {
+                        entry.setProductName(product.getName());
+                        entry.setProductCode(product.getCode());
+                        entry.setProductUrl(product.getUrl());
+
+                        if (product.getImages() != null && !product.getImages().isEmpty()) {
+                            String imgUrl = product.getImages().get(0).getUrl();
+                            entry.setProductImage(resolveImageUrl(imgUrl, concept, env));
+                        }
+                    }
+
+                    return entry;
+                })
+                .collect(Collectors.toList());
+
+        summary.setEntries(entries);
+        response.setOrders(Collections.singletonList(summary));
+        return response;
+    }
+
+    /**
+     * Ensures the image URL is absolute.
+     * Hybris sometimes returns a relative path (e.g. {@code /medias/sys_master/...}).
+     * Prefix it with the concept's environment base URL in that case.
+     */
+    private String resolveImageUrl(String imageUrl, String concept, String env) {
+        if (imageUrl == null || imageUrl.isBlank()) return null;
+        if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) return imageUrl;
+        return ConceptBaseUrlResolver.getEnvBaseUrl(concept, env) + imageUrl;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

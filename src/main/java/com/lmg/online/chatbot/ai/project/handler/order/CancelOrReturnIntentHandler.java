@@ -11,6 +11,7 @@ import com.lmg.online.chatbot.ai.request.ChatRequest;
 import com.lmg.online.chatbot.ai.tools.order.OrderTrackingTool;
 import com.lmg.online.chatbot.ai.tools.order.dto.CancelReturnResponse;
 import com.lmg.online.chatbot.ai.tools.order.dto.ChatbotOrderTrackingResponse;
+import com.lmg.online.chatbot.ai.tools.order.dto.HybrisSingleOrderResponse;
 import io.micrometer.common.util.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -22,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -155,7 +157,7 @@ public class CancelOrReturnIntentHandler implements IntentHandler<CancelReturnRe
 
     private void tryFetchOrder(ChatRequest request, String orderNo, CancelReturnResponse response) {
         try {
-            ChatbotOrderTrackingResponse apiResponse = orderTrackingTool.getSingleOrderDetails(
+            HybrisSingleOrderResponse hybrisResponse = orderTrackingTool.getSingleOrderDetails(
                     request.getUserId(),
                     request.getAccessToken(),
                     orderNo,
@@ -164,7 +166,7 @@ public class CancelOrReturnIntentHandler implements IntentHandler<CancelReturnRe
                     request.getAppid()
             );
 
-            if (apiResponse == null || apiResponse.getOrders() == null || apiResponse.getOrders().isEmpty()) {
+            if (hybrisResponse == null || hybrisResponse.getCode() == null || hybrisResponse.getCode().isBlank()) {
                 log.warn("⚠️ Order {} not found for userId={}", orderNo, request.getUserId());
                 response.setNeedsOrderNumber(true);
                 response.setChatMessage(
@@ -173,7 +175,9 @@ public class CancelOrReturnIntentHandler implements IntentHandler<CancelReturnRe
                 return;
             }
 
-            ChatbotOrderTrackingResponse.OrderSummary orderSummary = apiResponse.getOrders().get(0);
+            ChatbotOrderTrackingResponse.OrderSummary orderSummary =
+                    mapToOrderSummary(hybrisResponse, request.getConcept(), request.getEnv());
+
             if (orderSummary.getEntries() == null || orderSummary.getEntries().isEmpty()) {
                 log.warn("⚠️ Order {} returned empty entries for userId={}", orderNo, request.getUserId());
                 response.setNeedsOrderNumber(true);
@@ -194,6 +198,51 @@ public class CancelOrReturnIntentHandler implements IntentHandler<CancelReturnRe
                     "Please try again or contact support. " +
                     ConceptBaseUrlResolver.getPhoneNumber(request.getConcept()));
         }
+    }
+
+    /**
+     * Maps a raw {@link HybrisSingleOrderResponse} into the widget-compatible
+     * {@link ChatbotOrderTrackingResponse.OrderSummary} used by the cancel/return card.
+     */
+    private ChatbotOrderTrackingResponse.OrderSummary mapToOrderSummary(
+            HybrisSingleOrderResponse hybris, String concept, String env) {
+
+        ChatbotOrderTrackingResponse.OrderSummary summary = new ChatbotOrderTrackingResponse.OrderSummary();
+        summary.setOrderNo(hybris.getCode());
+        summary.setOrderStatus(
+                hybris.getStatusDisplay() != null ? hybris.getStatusDisplay() : hybris.getStatus());
+        summary.setOrderDate(hybris.getCreated());
+        summary.setOrderAmount(hybris.getTotalPrice() != null ? hybris.getTotalPrice().getValue() : null);
+
+        List<HybrisSingleOrderResponse.HybrisEntry> hybrisEntries =
+                hybris.getEntries() != null ? hybris.getEntries() : Collections.emptyList();
+
+        List<ChatbotOrderTrackingResponse.OrderEntry> entries = hybrisEntries.stream()
+                .map(he -> {
+                    ChatbotOrderTrackingResponse.OrderEntry entry =
+                            new ChatbotOrderTrackingResponse.OrderEntry();
+                    if (he.getEntryNumber() != null) entry.setPosition(he.getEntryNumber());
+                    entry.setOrderEntryPk(he.getOrderEntryPk());
+                    entry.setQuantity(he.getQuantity() != null ? he.getQuantity() : 1);
+                    entry.setReturnable(he.isReturnEligible());
+                    entry.setExchangeable(he.isExchangeEnabled());
+                    if (he.getProduct() != null) {
+                        entry.setProductCode(he.getProduct().getCode());
+                        entry.setProductUrl(he.getProduct().getUrl());
+                        if (he.getProduct().getImages() != null && !he.getProduct().getImages().isEmpty()) {
+                            String imgUrl = he.getProduct().getImages().get(0).getUrl();
+                            if (imgUrl != null && !imgUrl.isBlank()) {
+                                entry.setProductImage(imgUrl.startsWith("http") ? imgUrl
+                                        : ConceptBaseUrlResolver.getEnvBaseUrl(concept, env) + imgUrl);
+                            }
+                        }
+                    }
+                    return entry;
+                })
+                .collect(Collectors.toList());
+
+        summary.setEntries(entries);
+        return summary;
     }
 
     // ── RAG policy fetch ──────────────────────────────────────────────────────

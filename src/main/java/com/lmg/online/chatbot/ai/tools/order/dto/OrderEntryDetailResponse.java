@@ -30,6 +30,9 @@ public class OrderEntryDetailResponse {
     @JsonProperty("orderNo")
     private String orderNo;
 
+    @JsonProperty("productName")
+    private String productName;
+
     @JsonProperty("productCode")
     private String productCode;
 

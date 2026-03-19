@@ -100,6 +100,9 @@ public class ChatbotOrderTrackingResponse {
         @JsonProperty("position")
         private int position;
 
+        @JsonProperty("productName")
+        private String productName;
+
         @JsonProperty("productCode")
         private String productCode;
 
