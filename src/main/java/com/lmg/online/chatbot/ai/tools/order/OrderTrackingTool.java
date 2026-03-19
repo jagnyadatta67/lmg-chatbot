@@ -2,7 +2,7 @@ package com.lmg.online.chatbot.ai.tools.order;
 
 import com.lmg.online.chatbot.ai.auth.AuthenticationServiceUtil;
 import com.lmg.online.chatbot.ai.common.ConceptBaseUrlResolver;
-import com.lmg.online.chatbot.ai.tools.order.dto.HybrisSingleOrderResponse;
+import com.lmg.online.chatbot.ai.tools.order.dto.ChatbotOrderTrackingResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -12,23 +12,21 @@ import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 
 /**
- * Fetches full details for a single order from Hybris.
+ * Fetches order details for a single order from the chatbot order API.
  *
  * <pre>
- *   GET /landmarkshopscommercews/v2/{siteId}/en/users/{userId}/orders/{orderNo}
- *       ?orderRevamp=true&appId={appId}&position=0&fields=DEFAULT
+ *   GET /landmarkshopscommercews/v2/{siteId}/chatbot/user/{userId}/order
+ *       ?appId={appId}&orderNo={orderNo}
  *
  *   Headers:
  *     Content-Type: application/json
- *     access_token: {accessToken}          ← Hybris reads token from header
- *     X-Trace-ID:   {uuid}-A
+ *     access_token: {accessToken}
  * </pre>
  *
- * Returns a typed {@link HybrisSingleOrderResponse} so the handler can map
- * it directly to {@code OrderResponse} without any AI involvement.
+ * Returns a typed {@link ChatbotOrderTrackingResponse} so the handler can use
+ * it directly without any AI involvement or mapper step.
  * Returns {@code null} on error — the handler converts that to a friendly message.
  */
 @Slf4j
@@ -39,17 +37,17 @@ public class OrderTrackingTool {
     private AuthenticationServiceUtil authenticationServiceUtil;
 
     /**
-     * Fetch a single order's details.
+     * Fetch details for a single order.
      *
-     * @param userId      Customer's user ID (phone@landmarkmlogindomain.com)
+     * @param userId      Customer's user ID (e.g. phone@landmarkmlogindomain.com)
      * @param accessToken Customer's OAuth access token
      * @param orderNo     Numeric order number e.g. "9419396447"
      * @param concept     Brand: LIFESTYLE | MAX | HOMECENTRE | BABYSHOP
      * @param env         Environment: uat1 | uat5 | prod
      * @param appid       App: ANDROID | IPHONE | Desktop | Mobile
-     * @return Deserialized order, or {@code null} if the call fails
+     * @return Deserialized response, or {@code null} if the call fails
      */
-    public HybrisSingleOrderResponse getSingleOrderDetails(
+    public ChatbotOrderTrackingResponse getSingleOrderDetails(
             String userId,
             String accessToken,
             String orderNo,
@@ -61,13 +59,10 @@ public class OrderTrackingTool {
                 orderNo, userId, concept, env);
 
         try {
-            // /en/users/{userId}/orders/{orderNo}
-            String uriPath = "/en/users/" + userId + "/orders/" + orderNo;
+            String uriPath = "/chatbot/user/" + userId + "/order";
 
             Map<String, String> queryParams = new LinkedHashMap<>();
-            queryParams.put("orderRevamp", "true");
-            queryParams.put("position",    "0");
-            queryParams.put("fields",      "DEFAULT");
+            queryParams.put("orderNo", orderNo);
 
             String url = ConceptBaseUrlResolver.buildApiUrl(concept, env, uriPath, appid, queryParams);
             log.info("🌐 [OrderTrackingTool] URL: {}", url);
@@ -75,22 +70,21 @@ public class OrderTrackingTool {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("access_token", accessToken);
-            headers.set("X-Trace-ID",   UUID.randomUUID().toString() + "-A");
 
-            HybrisSingleOrderResponse response = authenticationServiceUtil
+            ChatbotOrderTrackingResponse response = authenticationServiceUtil
                     .callWithAuthRetry(appid, url, HttpMethod.GET, headers, null,
-                            HybrisSingleOrderResponse.class, env)
+                            ChatbotOrderTrackingResponse.class, env)
                     .getBody();
 
-            log.info("✅ [OrderTrackingTool] Fetched order code={} status={}",
-                    response != null ? response.getCode() : "null",
-                    response != null ? response.getStatusDisplay() : "null");
+            log.info("✅ [OrderTrackingTool] Fetched {} order(s) for orderNo={}",
+                    response != null && response.getOrders() != null ? response.getOrders().size() : 0,
+                    orderNo);
 
             return response;
 
         } catch (Exception e) {
             log.error("❌ [OrderTrackingTool] Failed for orderNo={}: {}", orderNo, e.getMessage(), e);
-            return null;  // handler converts null → friendly error message
+            return null;
         }
     }
 }

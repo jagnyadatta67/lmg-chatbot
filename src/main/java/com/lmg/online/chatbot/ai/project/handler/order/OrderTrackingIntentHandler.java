@@ -2,12 +2,11 @@ package com.lmg.online.chatbot.ai.project.handler.order;
 
 import com.lmg.online.chatbot.ai.analytics.AiAnalyticsService;
 import com.lmg.online.chatbot.ai.analytics.ChatbotResponse;
+import com.lmg.online.chatbot.ai.common.ConceptBaseUrlResolver;
 import com.lmg.online.chatbot.ai.project.handler.IntentHandler;
 import com.lmg.online.chatbot.ai.request.ChatRequest;
 import com.lmg.online.chatbot.ai.tools.order.OrderTrackingTool;
-import com.lmg.online.chatbot.ai.tools.order.dto.HybrisSingleOrderResponse;
-import com.lmg.online.chatbot.ai.tools.order.dto.OrderResponse;
-import com.lmg.online.chatbot.ai.tools.order.helper.HybrisOrderMapper;
+import com.lmg.online.chatbot.ai.tools.order.dto.ChatbotOrderTrackingResponse;
 import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,14 +23,13 @@ import java.util.regex.Pattern;
  *   1. Auth guard — userId must be present
  *   2. Extract order number from request.orderNo or via regex from message text
  *   3. No order number → return friendly ask message immediately
- *   4. Call OrderTrackingTool → Hybris REST → HybrisSingleOrderResponse
- *   5. HybrisOrderMapper converts DTO → OrderResponse (direct field mapping)
- *   6. Return ChatbotResponse
+ *   4. Call OrderTrackingTool → chatbot REST API → ChatbotOrderTrackingResponse
+ *   5. Return ChatbotResponse directly (no mapper needed — new API maps cleanly)
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class OrderTrackingIntentHandler implements IntentHandler<OrderResponse> {
+public class OrderTrackingIntentHandler implements IntentHandler<ChatbotOrderTrackingResponse> {
 
     /**
      * Fast-path routing: matches obvious order-tracking queries.
@@ -84,7 +82,7 @@ public class OrderTrackingIntentHandler implements IntentHandler<OrderResponse> 
     // ─────────────────────────────────────────────────────────────────────────
 
     @Override
-    public ChatbotResponse<OrderResponse> handle(ChatRequest request, long startTime) {
+    public ChatbotResponse<ChatbotOrderTrackingResponse> handle(ChatRequest request, long startTime) {
         log.info("📦 Handling ORDER_TRACKING, userId={}", request.getUserId());
 
         // 1. Auth guard
@@ -101,8 +99,8 @@ public class OrderTrackingIntentHandler implements IntentHandler<OrderResponse> 
 
         log.info("🔢 Order number: {}", orderNo);
 
-        // 3. Fetch from Hybris (pure REST, no AI)
-        HybrisSingleOrderResponse hybrisData = orderTrackingTool.getSingleOrderDetails(
+        // 3. Fetch from chatbot API (pure REST, no AI, no mapper)
+        ChatbotOrderTrackingResponse data = orderTrackingTool.getSingleOrderDetails(
                 request.getUserId(),
                 request.getAccessToken(),
                 orderNo,
@@ -111,12 +109,22 @@ public class OrderTrackingIntentHandler implements IntentHandler<OrderResponse> 
                 request.getAppid()
         );
 
-        // 4. Map directly to OrderResponse
-        OrderResponse data = HybrisOrderMapper.toOrderResponse(
-                hybrisData, request.getConcept(), request.getEnv());
+        // 4. Handle null response (API error)
+        if (data == null) {
+            ChatbotOrderTrackingResponse errorResp = new ChatbotOrderTrackingResponse();
+            errorResp.setChatMessage("Unable to fetch order details right now. "
+                    + ConceptBaseUrlResolver.getPhoneNumber(request.getConcept()));
+            errorResp.setOrders(Collections.emptyList());
+            return buildResponse(errorResp, request, startTime);
+        }
 
-        log.info("✅ Mapped {} items for orderNo={}",
-                data.getOrderDetailsList() != null ? data.getOrderDetailsList().size() : 0, orderNo);
+        // 5. Handle empty orders list
+        if (data.getOrders() == null || data.getOrders().isEmpty()) {
+            data.setChatMessage("No order found for order number " + orderNo + ". Please check and try again.");
+            data.setOrders(Collections.emptyList());
+        }
+
+        log.info("✅ Returning {} order(s) for orderNo={}", data.getOrders().size(), orderNo);
 
         return buildResponse(data, request, startTime);
     }
@@ -157,35 +165,36 @@ public class OrderTrackingIntentHandler implements IntentHandler<OrderResponse> 
 
     // ── Pre-built responses ───────────────────────────────────────────────────
 
-    private OrderResponse unauthResponse() {
-        OrderResponse r = new OrderResponse();
-        r.setChat_message(
+    private ChatbotOrderTrackingResponse unauthResponse() {
+        ChatbotOrderTrackingResponse r = new ChatbotOrderTrackingResponse();
+        r.setChatMessage(
                 "Please sign in to continue — once logged in I can fetch your order details.");
-        r.setOrderDetailsList(Collections.emptyList());
+        r.setOrders(Collections.emptyList());
         return r;
     }
 
-    private OrderResponse askForOrderNumberResponse() {
-        OrderResponse r = new OrderResponse();
-        r.setChat_message(
+    private ChatbotOrderTrackingResponse askForOrderNumberResponse() {
+        ChatbotOrderTrackingResponse r = new ChatbotOrderTrackingResponse();
+        r.setChatMessage(
                 "Please share your order number so I can look it up. " +
                 "Order numbers are numeric, e.g. 9419396447.");
-        r.setNeedsOrderNumber(true);   // signals frontend to open order-number input
+        r.setNeedsOrderNumber(true);
+        r.setOrders(Collections.emptyList());
         return r;
     }
 
     // ── Response builder ──────────────────────────────────────────────────────
 
-    private ChatbotResponse<OrderResponse> buildResponse(
-            OrderResponse data, ChatRequest request, long startTime) {
+    private ChatbotResponse<ChatbotOrderTrackingResponse> buildResponse(
+            ChatbotOrderTrackingResponse data, ChatRequest request, long startTime) {
 
         long responseTime = System.currentTimeMillis() - startTime;
 
         aiAnalyticsService.trackUsage(
-                data.getCustomerName(),
-                data.getMobileNo(),
+                null,
+                null,
                 request != null ? request.getMessage() : "",
-                data.getChat_message(),
+                data.getChatMessage(),
                 0, 0,
                 "none",
                 "stop",
@@ -196,7 +205,7 @@ public class OrderTrackingIntentHandler implements IntentHandler<OrderResponse> 
 
         log.info("📊 {} - Time: {}ms", getIntentType(), responseTime);
 
-        return ChatbotResponse.<OrderResponse>builder()
+        return ChatbotResponse.<ChatbotOrderTrackingResponse>builder()
                 .data(data)
                 .responseTimeMs(responseTime)
                 .intent(getIntentType())

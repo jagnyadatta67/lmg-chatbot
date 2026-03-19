@@ -108,6 +108,7 @@ public class HybrisOrderMapper {
             detail.setExchangeDay(entry.getExchangeDeliveryEstimateTatData());
             detail.setReturnAllow(entry.isReturnEligible()
                     || (product != null && product.isReturnableProduct()));
+            detail.setOrderEntryPk(entry.getOrderEntryPk());
 
             details.add(detail);
         }

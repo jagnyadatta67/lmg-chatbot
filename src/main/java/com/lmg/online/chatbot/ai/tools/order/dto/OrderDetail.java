@@ -42,4 +42,11 @@ public class OrderDetail {
     @JsonProperty(required = true, value = "exchangeDay")
     private String     exchangeDay;
 
+    /**
+     * Hybris order entry primary key — passed to ORDER_ENTRY_INTENT so the
+     * frontend can request full delivery/return details for this specific item.
+     */
+    @JsonProperty("orderEntryPk")
+    private String orderEntryPk;
+
 }

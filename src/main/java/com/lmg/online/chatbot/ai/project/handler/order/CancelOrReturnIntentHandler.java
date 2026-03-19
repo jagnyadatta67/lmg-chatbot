@@ -10,9 +10,7 @@ import com.lmg.online.chatbot.ai.project.handler.IntentHandler;
 import com.lmg.online.chatbot.ai.request.ChatRequest;
 import com.lmg.online.chatbot.ai.tools.order.OrderTrackingTool;
 import com.lmg.online.chatbot.ai.tools.order.dto.CancelReturnResponse;
-import com.lmg.online.chatbot.ai.tools.order.dto.HybrisSingleOrderResponse;
-import com.lmg.online.chatbot.ai.tools.order.dto.OrderResponse;
-import com.lmg.online.chatbot.ai.tools.order.helper.HybrisOrderMapper;
+import com.lmg.online.chatbot.ai.tools.order.dto.ChatbotOrderTrackingResponse;
 import io.micrometer.common.util.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -157,7 +155,7 @@ public class CancelOrReturnIntentHandler implements IntentHandler<CancelReturnRe
 
     private void tryFetchOrder(ChatRequest request, String orderNo, CancelReturnResponse response) {
         try {
-            HybrisSingleOrderResponse hybrisData = orderTrackingTool.getSingleOrderDetails(
+            ChatbotOrderTrackingResponse apiResponse = orderTrackingTool.getSingleOrderDetails(
                     request.getUserId(),
                     request.getAccessToken(),
                     orderNo,
@@ -166,7 +164,7 @@ public class CancelOrReturnIntentHandler implements IntentHandler<CancelReturnRe
                     request.getAppid()
             );
 
-            if (hybrisData == null) {
+            if (apiResponse == null || apiResponse.getOrders() == null || apiResponse.getOrders().isEmpty()) {
                 log.warn("⚠️ Order {} not found for userId={}", orderNo, request.getUserId());
                 response.setNeedsOrderNumber(true);
                 response.setChatMessage(
@@ -175,11 +173,9 @@ public class CancelOrReturnIntentHandler implements IntentHandler<CancelReturnRe
                 return;
             }
 
-            OrderResponse orderData = HybrisOrderMapper.toOrderResponse(
-                    hybrisData, request.getConcept(), request.getEnv());
-
-            if (orderData.getOrderDetailsList() == null || orderData.getOrderDetailsList().isEmpty()) {
-                log.warn("⚠️ Order {} returned empty details for userId={}", orderNo, request.getUserId());
+            ChatbotOrderTrackingResponse.OrderSummary orderSummary = apiResponse.getOrders().get(0);
+            if (orderSummary.getEntries() == null || orderSummary.getEntries().isEmpty()) {
+                log.warn("⚠️ Order {} returned empty entries for userId={}", orderNo, request.getUserId());
                 response.setNeedsOrderNumber(true);
                 response.setChatMessage(
                         "I couldn't find order <b>" + orderNo + "</b>. " +
@@ -187,8 +183,8 @@ public class CancelOrReturnIntentHandler implements IntentHandler<CancelReturnRe
                 return;
             }
 
-            log.info("✅ Order {} fetched — {} item(s)", orderNo, orderData.getOrderDetailsList().size());
-            response.setOrderData(orderData);
+            log.info("✅ Order {} fetched — {} item(s)", orderNo, orderSummary.getEntries().size());
+            response.setOrderData(orderSummary);
 
         } catch (Exception e) {
             log.error("❌ Error fetching order {} : {}", orderNo, e.getMessage(), e);

@@ -68,4 +68,19 @@ public class ChatRequest {
      * e.g. "ORDER_TRACKING", "DELIVERY_TRACKING", "RETURN_STATUS".
      */
     private String intentHint;
+
+    /**
+     * Order entry primary key for fetching individual item delivery/return details.
+     * Populated by the widget when the user clicks "More Details" on a specific
+     * order entry card. Used by ORDER_ENTRY_INTENT handler.
+     */
+    private String entryPk;
+
+    /**
+     * Return Merchandise Authorization number.
+     * Populated by the widget when the user clicks "Return Status" on an entry
+     * detail card that already has a returnDetail. Used by RETURN_STATUS_DETAIL handler
+     * to fetch return status directly without AI extraction.
+     */
+    private String rmaNo;
 }

@@ -28,8 +28,8 @@ public class IntentClassifier {
         Query: %s
 
         === KEY DISTINCTION: PERSONAL STATUS vs POLICY QUESTION ===
-        - Personal status query  ("where is MY order", "MY return status", "when will I get MY refund")
-          → route to the relevant action intent (ORDER_TRACKING, RETURN_STATUS, etc.)
+        - Personal status query  ("where is MY order", "when will I get MY refund")
+          → route to the relevant action intent (ORDER_TRACKING, CANCEL_OR_RETURN, etc.)
           → the backend will ask the user for an order number if one is missing.
         - General policy question ("what is the return policy", "how do I cancel", "how long does delivery take")
           → route to POLICY_QUESTION.
@@ -42,6 +42,7 @@ public class IntentClassifier {
           Examples: "track order 9419396447", "where is my order", "what is my order status",
           "has my order shipped", "my order status".
           Do NOT use for: "what is the return policy", "how do I cancel" → use POLICY_QUESTION.
+          Do NOT use for delivery-specific queries ("when will it arrive", "track shipment") → use ORDER_TRACKING.
 
         - CANCEL_OR_RETURN: Customer wants to take one of these 4 actions on their OWN order:
             (1) CANCEL their order
@@ -62,23 +63,15 @@ public class IntentClassifier {
             → use RETURN_STATUS
           - Generic vague questions: "can I cancel" with no order context → use POLICY_QUESTION
 
+        - ORDER_ENTRY_INTENT: Internal intent triggered ONLY by the widget's "More Details" button
+          on a specific order entry card. Never classify free-text as this intent.
+          Always routed via intentHint from the frontend — the AI classifier should never pick this.
+
         - ORDER_LISTING: Customer wants to see their full order history.
           Use for ANY query about multiple orders or order history.
           Examples: "my orders", "order history", "show my orders", "past orders",
           "recent purchases", "what have I ordered", "all my orders".
           Do not use if a specific order number is present — use ORDER_TRACKING instead.
-
-        - DELIVERY_TRACKING: Customer asking about delivery/shipment status of their own order.
-          Use when the user asks about their own delivery, shipment, dispatch, or when it will arrive.
-          Examples: "when will my order arrive", "where is my delivery", "track my shipment",
-          "delivery status", "out for delivery", "dispatch status for order 3400746000".
-          Do NOT use for: "how long does delivery take" → use POLICY_QUESTION.
-
-        - RETURN_STATUS: Customer asking about return or refund status of their own item.
-          Use when the user asks about their own return pickup, refund status, or exchange status.
-          Examples: "my return status", "when will I get my refund", "refund status",
-          "return pickup status", "my exchange status", "return status for order 9419396447".
-          Do NOT use for: "what is the return policy", "how do I initiate a return" → use POLICY_QUESTION.
 
         - WALLET_BALANCE: Customer asks about their wallet, store credit, or cashback balance.
           Examples: "my wallet balance", "how much credit do I have", "store credit balance".
