@@ -48,4 +48,10 @@ public class ChatClientConfig {
     public ChatClient returnStatusClient(OpenAiChatModel chatModel) {
         return ChatClient.builder(chatModel).build();
     }
+
+    // Cancel or Return Client (RAG policy + order context for CANCEL_OR_RETURN intent)
+    @Bean(name = "cancelReturnClient")
+    public ChatClient cancelReturnClient(OpenAiChatModel chatModel) {
+        return ChatClient.builder(chatModel).build();
+    }
 }

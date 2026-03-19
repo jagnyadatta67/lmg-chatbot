@@ -2,34 +2,17 @@
   const scriptTag =
     document.currentScript || Array.from(document.querySelectorAll('script[src*="chatbot-widget.js"]')).pop()
 
-  /**
-   * Read a cookie value by name from the current page's document.cookie.
-   * Returns null if the cookie is not found or is HttpOnly (unreadable by JS).
-   * Used to auto-detect logged-in user token from _lmgua cookie set by the store.
-   */
-  function getCookie(name) {
-    // Return the raw URL-encoded value — do NOT decode.
-    // The backend passes this token directly to the brand OAuth API via a URL
-    // parameter, so it must stay URL-encoded (%2F → /, %2B → +, %3D → =)
-    // or token validation fails on the brand side.
-    const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'))
-    return match ? match[1] : null
-  }
-
   // --- Config ---
-  // Priority for userid/token:
-  //   1. data-userid attribute on <script> tag   (explicit, highest priority)
-  //   2. window.CHATBOT_CONFIG.userid             (programmatic override)
-  //   3. _lmgua cookie                           (auto-detect logged-in user from store cookie)
-  //   4. null                                    (anonymous user, no token)
+  // All values are read from data-* attributes on the <script> tag, falling back to window.CHATBOT_CONFIG.
+  // Example: <script src="chatbot-widget.js" data-backend="https://api.example.com/api/chat" data-concept="LIFESTYLE" ...>
   const config = {
-    backend:     scriptTag?.getAttribute("data-backend")  || window.CHATBOT_CONFIG?.backend  || "http://localhost:8080/api/chat",
-    userid:      scriptTag?.getAttribute("data-userid")   || window.CHATBOT_CONFIG?.userid   || getCookie("_lmgua") || null,
-    concept:     (scriptTag?.getAttribute("data-concept") || window.CHATBOT_CONFIG?.concept  || "LIFESTYLE").toUpperCase(),
-    appid:       scriptTag?.getAttribute("data-appid")    || window.CHATBOT_CONFIG?.appid    || "UNKNOWN_APP",
-    env:         scriptTag?.getAttribute("data-env")      || window.CHATBOT_CONFIG?.env      || "uat5",
-    giftcardEnv: scriptTag?.getAttribute("data-env")      || window.CHATBOT_CONFIG?.env      || "uat5",
-    apikey:      scriptTag?.getAttribute("X-API-Key")     || window.CHATBOT_CONFIG?.apikey   || "",
+    backend: scriptTag?.getAttribute("data-backend") || window.CHATBOT_CONFIG?.backend || "http://localhost:8080/api/chat",
+    userid: scriptTag?.getAttribute("data-userid") || window.CHATBOT_CONFIG?.userid || "UNKNOWN_USER",
+    concept: (scriptTag?.getAttribute("data-concept") || window.CHATBOT_CONFIG?.concept || "LIFESTYLE").toUpperCase(),
+    appid: scriptTag?.getAttribute("data-appid") || window.CHATBOT_CONFIG?.appid || "UNKNOWN_APP",
+    env: scriptTag?.getAttribute("data-env") || window.CHATBOT_CONFIG?.env || "uat5",
+    giftcardEnv: scriptTag?.getAttribute("data-env") || window.CHATBOT_CONFIG?.env || "uat5",
+    apikey: scriptTag?.getAttribute("X-API-Key") || window.CHATBOT_CONFIG?.apikey || "",
   }
 
   console.log("💎 Chatbot Config:", config)
@@ -40,81 +23,64 @@
   let profileCachePromise = null   // tracks the in-flight profile fetch
 
   async function resolveSession() {
-    const backendBase = config.backend.replace(/\/api\/chat.*$/, "")
-    const url         = `${backendBase}/api/user/token-details`
+    const rawToken = config.userid
+    if (!rawToken || rawToken === "UNKNOWN_USER") return
 
-    /**
-     * Try to resolve a raw token via /api/user/token-details.
-     * Returns true if session was populated, false on any failure.
-     * Also checks sessionStorage cache first to avoid redundant API calls.
-     */
-    async function tryToken(rawToken, source) {
-      if (!rawToken || rawToken === "UNKNOWN_USER") return false
-
-      // sessionStorage cache — keyed by concept + token so different
-      // brands / users on the same browser never share a cached result.
-      const cacheKey = `chatbot_session_${config.concept}_${rawToken}`
-      const cached   = sessionStorage.getItem(cacheKey)
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached)
-          session.customerId  = parsed.customerId  || "anonymous"
-          session.accessToken = parsed.accessToken || null
-          console.log(`💎 Session restored from cache [${source}]:`, session.customerId)
-          profileCachePromise = fetchProfileCache()
-          return true
-        } catch { /* corrupted cache entry — fall through to API call */ }
-      }
-
+    // sessionStorage cache — keyed by concept + raw token so different
+    // brands / users on the same browser never share a cached result.
+    const cacheKey = `chatbot_session_${config.concept}_${rawToken}`
+    const cached = sessionStorage.getItem(cacheKey)
+    if (cached) {
       try {
-        const res = await fetch(url, {
-          method:  "POST",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({
-            token:   rawToken,
-            concept: config.concept,
-            env:     config.env,
-            appId:   config.appid,
-          }),
-        })
-
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-
-        const data = await res.json()
-        const uid  = data.uid || data.customerId || null
-
-        // Treat empty / "anonymous" response as failure so we try next source
-        if (!uid || uid === "anonymous") throw new Error("no valid uid in response")
-
-        session.customerId  = uid
-        session.accessToken = data.accessToken || data.access_token || null
-
-        sessionStorage.setItem(cacheKey, JSON.stringify({
-          customerId:  session.customerId,
-          accessToken: session.accessToken,
-        }))
-        console.log(`💎 Session resolved [${source}]:`, session.customerId)
-
-        // Pre-fetch profile immediately so "My Profile" renders from cache instantly
+        const parsed = JSON.parse(cached)
+        session.customerId  = parsed.customerId  || "anonymous"
+        session.accessToken = parsed.accessToken || null
+        console.log("💎 Session restored from cache:", session.customerId)
         profileCachePromise = fetchProfileCache()
-        return true
-
-      } catch (err) {
-        console.warn(`⚠️ Token resolution failed [${source}]:`, err.message)
-        return false
-      }
+        return
+      } catch { /* corrupted entry — fall through to API call */ }
     }
 
-    // ── Priority 1: _lmgua cookie (auto-detect logged-in user) ──────────────
-    const cookieToken = getCookie("_lmgua")
-    if (await tryToken(cookieToken, "cookie")) return
+    // Derive the backend base URL from config.backend
+    // e.g. "http://localhost:8080/api/chat" → "http://localhost:8080"
+    const backendBase = config.backend.replace(/\/api\/chat.*$/, "")
+    const url = `${backendBase}/api/user/token-details`
 
-    // ── Priority 2: data-userid attribute / window.CHATBOT_CONFIG.userid ────
-    const attrToken = scriptTag?.getAttribute("data-userid") || window.CHATBOT_CONFIG?.userid || null
-    if (await tryToken(attrToken, "data-userid")) return
+    try {
+      const res = await fetch(url, {
+        method:  "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key":    config.apikey,
+        },
+        body: JSON.stringify({
+          token:   rawToken,
+          concept: config.concept,
+          env:     config.env,
+          appId:   config.appid,
+        }),
+      })
 
-    // ── Both failed → stay anonymous ────────────────────────────────────────
-    console.log("💎 No valid token found — anonymous session")
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+      const data = await res.json()
+      // uid       = field name in UserWsDTO (Spring backend)
+      // customerId = field name from raw brand API response
+      // access_token / accessToken = both covered (snake_case from brand API, camelCase from backend)
+      session.customerId  = data.uid || data.customerId || "anonymous"
+      session.accessToken = data.accessToken || data.access_token || null
+
+      sessionStorage.setItem(cacheKey, JSON.stringify({
+        customerId:  session.customerId,
+        accessToken: session.accessToken,
+      }))
+      console.log("💎 Session resolved:", session.customerId)
+
+      // Pre-fetch profile immediately so "My Profile" renders from cache instantly
+      profileCachePromise = fetchProfileCache()
+    } catch (err) {
+      console.warn("⚠️ Token resolution failed, using anonymous:", err.message)
+    }
   }
 
   async function fetchProfileCache() {
@@ -123,7 +89,7 @@
       const backendBase = config.backend.replace(/\/api\/chat.*$/, "")
       const res = await fetch(`${backendBase}/api/user/profile`, {
         method:  "POST",
-        headers: { "Content-Type": "text/plain" },
+        headers: { "Content-Type": "application/json", "X-API-Key": config.apikey },
         body: JSON.stringify({
           token:   session.accessToken,
           concept: config.concept,
@@ -635,16 +601,6 @@
         border: 1px solid #e5e7eb; flex-shrink: 0;
         background: #f3f4f6;
       }
-      /* Product rows inside a single-order tracking card */
-      .order-products-detail { margin: 8px 0; }
-      .order-product-row {
-        display: flex; align-items: flex-start; gap: 8px;
-        padding: 6px 0; border-bottom: 1px solid #f0f0f0;
-      }
-      .order-product-row:last-child { border-bottom: none; }
-      .order-product-meta {
-        font-size: 11px; color: #444; line-height: 1.6; flex: 1;
-      }
       .order-card-actions {
         display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;
       }
@@ -964,7 +920,7 @@
           try {
             const res = await fetch(url, {
               method:  "POST",
-              headers: { "Content-Type": "text/plain" },
+              headers: { "Content-Type": "application/json", "X-API-Key": config.apikey },
               body: JSON.stringify({
                 token:   session.accessToken,   // user's personal access_token
                 concept: config.concept,
@@ -1099,9 +1055,7 @@
     const renderBotMessage = (msg, id = null) => {
       const bubble = document.createElement("div");
       bubble.className = "bubble bot-bubble";
-      // Wrap in <p> so inline text + <strong> tags stay on one line
-      // (without this, flex-direction:column splits each inline node into its own row)
-      bubble.innerHTML = `<p style="margin:0;padding:0">${msg.replace(/\n/g, "<br/>")}</p>`;
+      bubble.innerHTML = msg.replace(/\n/g, "<br/>");
 
       if (!id) {
         id = "msg-" + Date.now() + "-" + Math.floor(Math.random() * 99999);
@@ -1118,7 +1072,7 @@
     const updateBotMessage = (id, newMsg) => {
       const el = document.getElementById(id);
       if (el) {
-        el.innerHTML = `<p style="margin:0;padding:0">${newMsg.replace(/\n/g, "<br/>")}</p>`;
+        el.innerHTML = newMsg.replace(/\n/g, "<br/>");
       }
     };
 
@@ -1191,7 +1145,6 @@
       POLICY_QUESTION:    handleGeneralIntent,
       GENERAL_QUERY:      handleGeneralIntent,
       ORDER_TRACKING:     handleOrderTracking,
-      CANCEL_OR_RETURN:   handleCancelOrReturn,
       CUSTOMER_PROFILE:   handleCustomerProfile,
       ORDER_LISTING:      handleChatbotOrderList,
       DELIVERY_TRACKING:  handleDeliveryTrackingResponse,
@@ -1360,144 +1313,31 @@
     }
 
 
-    /**
-     * Shared helper — renders a single-order detail card into the chat body.
-     * Accepts an OrderResponse payload (or any object with orderDetailsList[]).
-     * Returns true if a card was rendered, false if orderDetailsList was empty.
-     */
-    function renderSingleOrderCard(orderData) {
-      const items = Array.isArray(orderData?.orderDetailsList) ? orderData.orderDetailsList : []
-      if (items.length === 0) return false
-
-      const first    = items[0]
-      const orderNo  = first.orderNo     || "N/A"
-      const status   = first.orderStatus || "Unknown"
-      const rawDate  = first.orderDate
-      const date     = rawDate ? new Date(rawDate).toLocaleDateString() : "N/A"
-      const amount   = first.netAmount   || (first.orderAmount != null ? `₹${first.orderAmount}` : "N/A")
-      const orderUrl = `${window.location.origin}/in/en/my-account/order/${orderNo}`
-
-      // Product rows — one per orderDetailsList entry
-      const productRowsHtml = items.map(item => {
-        const img = item.imageURL
-          ? `<a href="${item.productURL || orderUrl}" target="_blank">` +
-              `<img src="${item.imageURL}" alt="${item.productName || 'Product'}" ` +
-                   `class="order-product-thumb" onerror="this.style.display='none'">` +
-            `</a>`
-          : ""
-        const meta = [
-          item.productName  ? `<b>${item.productName}</b>`                                        : null,
-          item.qty          ? `Qty: ${item.qty}`                                                   : null,
-          item.color        ? `Color: ${item.color}`                                               : null,
-          item.size         ? `Size: ${item.size}`                                                 : null,
-          item.netAmount    ? `Amount: ${item.netAmount}`                                          : null,
-          item.latestStatus ? `Status: ${item.latestStatus}`                                       : null,
-          item.estmtDate    ? `Est. Delivery: ${new Date(item.estmtDate).toLocaleDateString()}`    : null,
-        ].filter(Boolean).join(" &nbsp;·&nbsp; ")
-        return `<div class="order-product-row">${img}<div class="order-product-meta">${meta}</div></div>`
-      }).join("")
-
-      const canReturn   = items.some(i => i.returnAllow)
-      const canExchange = items.some(i => i.exchangeAllow)
-      const actionsNote = [
-        canReturn   ? "✅ Return eligible"   : "❌ Return not available",
-        canExchange ? "✅ Exchange eligible" : "❌ Exchange not available",
-      ].join(" &nbsp;&nbsp; ")
-
-      chatBody.innerHTML += `
-        <div class="order-card">
-          <div class="order-card-content">
-            <div class="order-card-header">
-              <div class="order-card-title">Order #${orderNo}</div>
-              <span class="order-status-badge">${status}</span>
-            </div>
-            <div class="order-card-meta"><strong>Date:</strong> ${date}</div>
-            <div class="order-card-meta"><strong>Amount:</strong> ${amount}</div>
-            <div class="order-products-detail">${productRowsHtml}</div>
-            <div class="order-card-meta order-return-note" style="font-size:0.82em;color:#666;">${actionsNote}</div>
-            <div class="order-card-actions">
-              <a href="${orderUrl}" target="_blank" style="text-decoration:none;">
-                <button class="order-btn order-btn-primary">View Order</button>
-              </a>
-              <button class="order-btn order-btn-secondary" onclick="copyToClipboard('${orderNo}')">Copy #</button>
-            </div>
-          </div>
-        </div>`
-
-      chatBody.scrollTop = chatBody.scrollHeight
-      return true
-    }
-
-    /**
-     * Renders the OrderResponse returned by ORDER_TRACKING intent.
-     * Shape: { chat_message, needsOrderNumber, orderDetailsList[] }
-     */
     function handleOrderTracking(payload) {
-      if (checkAndTriggerLogin(payload, "Please sign in to track your orders.")) return
+      if (checkAndTriggerLogin(payload, "Please login to check your order details.")) return
 
-      // Backend prompts for an order number
+      // Backend explicitly signalled it needs an order number from the user
       if (payload.needsOrderNumber) {
-        renderBotMessage(payload.chat_message || "Please share your <b>order number</b> so I can look it up.")
+        renderBotMessage(payload.chat_message || "Please share your order number so I can look it up.")
         openOrderInput("Enter your order number...", (msg) =>
           sendMessageWithIntent("ORDER_TRACKING", msg, { orderNo: msg })
         )
         return
       }
 
-      // Error / info message only
       if (payload.chat_message && payload.chat_message.trim() !== "") {
         renderBotMessage(payload.chat_message)
-        renderBackToMenu()
-        enableInput("Type your message...")
-        return
+      } else {
+        renderBotMessage("<b>🧾 Order Details:</b>")
+
+        if (Array.isArray(payload.orderDetailsList) && payload.orderDetailsList.length > 0) {
+          payload.orderDetailsList.forEach((o) => {
+            chatBody.innerHTML += renderOrderCard(o)
+          })
+        } else {
+          renderBotMessage("No recent orders found.")
+        }
       }
-
-      const rendered = renderSingleOrderCard(payload)
-      if (!rendered) {
-        renderBotMessage("📦 No order details found. Please check the order number and try again.")
-      }
-      renderBackToMenu()
-      enableInput("Type your message...")
-    }
-
-    /**
-     * Renders the CancelReturnResponse returned by CANCEL_OR_RETURN intent.
-     * Shape: { chat_message, orderData, policyText, needsOrderNumber }
-     *
-     * UI order:
-     *   1. Order card (if orderData is present)
-     *   2. Policy text (always shown when available)
-     *   3. If needsOrderNumber → show error + order-number input for retry
-     */
-    function handleCancelOrReturn(payload) {
-      if (checkAndTriggerLogin(payload, "Please sign in to check your order.")) return
-
-      // 1. Render the specific order card (if found)
-      if (payload.orderData) {
-        renderSingleOrderCard(payload.orderData)
-      }
-
-      // 2. Always show the policy text
-      if (payload.policyText && payload.policyText.trim() !== "") {
-        renderBotMessage(payload.policyText)
-      }
-
-      // 3. Order number was wrong / order not found → prompt for correct number
-      if (payload.needsOrderNumber) {
-        const errMsg = payload.chat_message || "Please enter the correct order number to check your specific order:"
-        renderBotMessage(errMsg)
-        openOrderInput("Enter order number...", (msg) =>
-          sendMessageWithIntent("CANCEL_OR_RETURN", msg, { orderNo: msg })
-        )
-        // Don't show back-to-menu — user still needs to enter the order number
-        return
-      }
-
-      // 4. Fallback: plain error message only (no policy, no order)
-      if (!payload.policyText && payload.chat_message && payload.chat_message.trim() !== "") {
-        renderBotMessage(payload.chat_message)
-      }
-
       renderBackToMenu()
       enableInput("Type your message...")
     }
@@ -1908,7 +1748,7 @@
       WRITE_US:            () => { handleWriteUs({}) },
 
       // ── Auth-required (gate shows instantly for anonymous users) ──────────
-      TRACK_ORDER:         async () => { await handleOrderListingMenu() },   // same as Order History
+      TRACK_ORDER:         async () => { await handleOrderTrackMenu() },
       ORDER_LISTING:       async () => { await handleOrderListingMenu() },
       DELIVERY_TRACKING:   async () => { await handleDeliveryTrackingMenu() },
       RETURN_STATUS:       async () => { await handleReturnStatusMenu() },
@@ -1966,11 +1806,36 @@
 
     /**
      * ORDER_TRACKING menu entry-point.
-     * Now shows the order list (same as Order History) —
-     * backend returns OrderListResponse for both ORDER_TRACKING and ORDER_LISTING.
+     * Prompts the user to enter a numeric order number, validates it,
+     * then sends it to the backend as message + orderNo field.
      */
     async function handleOrderTrackMenu() {
-      await handleOrderListingMenu()
+      if (!session.customerId) {
+        renderBotMessage("🔒 Please sign in first to track your orders.")
+        renderBackToMenu()
+        return
+      }
+
+      renderBotMessage("📦 Please enter your <b>Order Number</b> to check its status.")
+
+      openOrderInput("Enter your order number...", async (raw) => {
+        showLoader("Looking up your order…")
+        const { data: json, error } = await api._post(
+          "/chat",
+          { ...api._context(), message: "Track order " + raw, orderNo: raw },
+          null
+        )
+        hideLoader()
+
+        if (error || !json) {
+          renderBotMessage("⚠️ Unable to fetch order details. Please try again later.")
+          renderBackToMenu()
+          return
+        }
+
+        const payload = typeof json.data === "string" ? { chat_message: json.data } : json.data || json
+        handleOrderTracking(payload)
+      })
     }
 
 
@@ -2106,7 +1971,7 @@
         const amount   = o.orderAmount != null
           ? `₹${o.orderAmount}`
           : (o.totalPrice?.value != null ? `₹${o.totalPrice.value}` : "N/A")
-        const orderUrl = `${window.location.origin}/in/en/my-account/order/${orderNo}`
+        const orderUrl = `${window.location.origin}/my-account/order/${orderNo}`
 
         // Build product thumbnails strip from entries[]
         // Resolves image from either:

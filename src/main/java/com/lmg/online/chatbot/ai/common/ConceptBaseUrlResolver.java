@@ -96,7 +96,7 @@ public class ConceptBaseUrlResolver {
     // === HELPER METHODS ===
 
     /** Resolve concept base URL */
-    private static String getBaseUrl(String conceptCode) {
+    public static String getBaseUrl(String conceptCode) {
         String url = BASE_URLS.get(normalize(conceptCode));
         if (url == null)
             throw new IllegalArgumentException("❌ No base URL configured for concept: " + conceptCode);
@@ -104,7 +104,7 @@ public class ConceptBaseUrlResolver {
     }
 
     /** Replace "www." with environment prefix (e.g., uat5.) */
-    private static String getEnvBaseUrl(String concept, String env) {
+    public static String getEnvBaseUrl(String concept, String env) {
         String baseUrl = getBaseUrl(concept);
         if (isBlank(env)) return baseUrl;
         return baseUrl.replace("www.", env.trim() + ".");
@@ -207,17 +207,12 @@ public class ConceptBaseUrlResolver {
 
         // Decode first so UriComponentsBuilder encodes exactly once,
         // even if the token arrived already percent-encoded.
-        String decodedToken;
-        try {
-            decodedToken = URLDecoder.decode(token, StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            decodedToken = token; // not valid percent-encoded — use as-is
-        }
+
 
         return UriComponentsBuilder
                 .fromHttpUrl(apiPath)
                 .queryParam("appId", appId)
-                .queryParam("token", decodedToken)
+                .queryParam("token", token)
                 .toUriString();
     }
 
@@ -232,34 +227,7 @@ public class ConceptBaseUrlResolver {
      * and {@code .build().toUri()} locks in the encoding so RestTemplate
      * never touches it again.
      */
-    public static URI buildTokenDetailsUri(String concept, String env,
-                                           String token,   String appId) {
-        validateInputs(concept, "chatbot/getTokenDetails");
 
-        String baseUrl = getEnvBaseUrl(concept, env);
-        String siteId  = getSiteId(concept);
-
-        String apiPath = buildPath(
-                baseUrl,
-                "landmarkshopscommercews/v2",
-                siteId,
-                "chatbot/getTokenDetails"
-        );
-
-        String decodedToken;
-        try {
-            decodedToken = URLDecoder.decode(token, StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            decodedToken = token;
-        }
-
-        return UriComponentsBuilder
-                .fromHttpUrl(apiPath)
-                .queryParam("appId", appId)
-                .queryParam("token", decodedToken)
-                .build()       // encode=false — values are raw, builder will encode once
-                .toUri();      // returns URI — RestTemplate will NOT re-encode
-    }
 
     /** 🔹 Build Token URL: https://<env>.<domain>/landmarkshopscommercews/in/oauth/token */
     public static String buildTokenUrl(String concept, String env) {

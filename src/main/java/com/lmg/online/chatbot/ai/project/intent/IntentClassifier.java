@@ -43,6 +43,25 @@ public class IntentClassifier {
           "has my order shipped", "my order status".
           Do NOT use for: "what is the return policy", "how do I cancel" → use POLICY_QUESTION.
 
+        - CANCEL_OR_RETURN: Customer wants to take one of these 4 actions on their OWN order:
+            (1) CANCEL their order
+            (2) RETURN a product
+            (3) EXCHANGE a product
+            (4) Get a REFUND on their order
+          STRICT RULE — only use CANCEL_OR_RETURN when the request is clearly about THE CUSTOMER'S OWN order.
+          Required signal: "my", "this", "the" before order/item/product — OR an order number — OR explicit
+          personal intent ("I want to", "can I", "how can I", "how do I") + any of the 4 actions.
+          Examples: "can I cancel my order", "I want to return this item", "cancel order 9419472006",
+          "how do I exchange my product", "I want a refund on my order", "return my item",
+          "9419472006 can i cancel this", "can I exchange this", "how can I get a refund",
+          "I need to cancel", "I want to return", "refund for my order".
+          Do NOT use for:
+          - Policy questions: "what is the return policy", "how does cancellation work", "return window"
+            → use POLICY_QUESTION
+          - Checking return/refund status: "what is my refund status", "return pickup status"
+            → use RETURN_STATUS
+          - Generic vague questions: "can I cancel" with no order context → use POLICY_QUESTION
+
         - ORDER_LISTING: Customer wants to see their full order history.
           Use for ANY query about multiple orders or order history.
           Examples: "my orders", "order history", "show my orders", "past orders",

@@ -28,7 +28,28 @@ import java.util.stream.Collectors;
 @Component
 public class PolicyIntentHandler implements IntentHandler<String> {
 
+    /**
+     * Matches general policy / how-to questions about cancel, return, exchange, refund.
+     *
+     * Negative lookaheads at the front EXCLUDE messages that belong to CANCEL_OR_RETURN:
+     *   • order number (7–12 digits) + action keyword   → CANCEL_OR_RETURN
+     *   • personal intent verb (I want to / can I / ...) + action → CANCEL_OR_RETURN
+     *   • possessive/demonstrative + order noun + action → CANCEL_OR_RETURN
+     *
+     * Only generic, non-personal policy questions reach this handler.
+     * Examples that still match: "what is the return policy", "cancellation charges",
+     *   "how long does a refund take", "free shipping", "delivery charges".
+     * Examples that NO LONGER match: "9419472006 i want to cancel",
+     *   "I want to return my item", "can I exchange this order".
+     */
     private static final Pattern POLICY_QUESTION_PATTERN = Pattern.compile(
+            // ── Exclusions: these belong to CANCEL_OR_RETURN ──────────────────
+            "(?!.*\\d{7,12}.*\\b(cancel|return|exchange|refund)\\b)" +
+            "(?!.*\\b(cancel|return|exchange|refund)\\b.*\\d{7,12})" +
+            "(?!.*\\b(i\\s+want\\s+to|i\\s+need\\s+to|i\\s+would\\s+like\\s+to|can\\s+i|how\\s+can\\s+i|how\\s+do\\s+i)\\s+(cancel|return|exchange|get\\s+a?\\s*refund)\\b)" +
+            "(?!.*\\b(cancel|return|exchange|refund)\\b.*\\b(my|this|the)\\b.*\\b(order|item|product|purchase)\\b)" +
+            "(?!.*\\b(my|this|the)\\b.*\\b(order|item|product|purchase)\\b.*\\b(cancel|return|exchange|refund)\\b)" +
+            // ── Policy question keywords ───────────────────────────────────────
             ".*\\b(" +
                     "policy|return|refund|exchange|cancel|cancellation|replace|replacement|" +
                     "shipping|delivery\\s*charges|delivery\\s*policy|return\\s*policy|" +

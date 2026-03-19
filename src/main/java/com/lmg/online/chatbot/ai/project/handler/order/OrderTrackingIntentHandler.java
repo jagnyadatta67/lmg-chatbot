@@ -33,10 +33,44 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class OrderTrackingIntentHandler implements IntentHandler<OrderResponse> {
 
-    /** Fast-path routing: matches obvious order-tracking queries */
+    /**
+     * Fast-path routing: matches obvious order-tracking queries.
+     *
+     * Two alternatives:
+     *
+     *   Alt 1 — Explicit tracking keywords (track, order status, where is my order, etc.)
+     *            Two negative lookaheads block CANCEL_OR_RETURN territory:
+     *              1. Exact action keywords — "cancel / return / exchange / refund"
+     *              2. Personal intent phrases — "i want to", "can i", "how do i", etc.
+     *                 (catches action-word typos like "canccel", "excahange" via the phrase)
+     *
+     *   Alt 2 — Bare order number ONLY (message is just the digits, nothing else)
+     *            e.g. "9419472006" typed alone → fast-path here.
+     *            A number followed by ANY other word (even a typo like "canccel it") does
+     *            NOT match this alternative and falls through to the AI classifier, which
+     *            correctly resolves the intent despite the typo.
+     *
+     * Examples that MATCH (route here):
+     *   "track order 9419396447", "where is my order", "order status",
+     *   "9419472006" (bare number)
+     * Examples that do NOT match (route to CANCEL_OR_RETURN or AI classifier):
+     *   "9419472006 canccel it"  ← typo, falls to AI → CANCEL_OR_RETURN
+     *   "9419472006 i want to excahange"  ← intent phrase + typo, Alt 1 lookahead 2 blocks
+     *   "9419472006 i want to cancel"     ← blocked by both lookaheads
+     *   "can i return this", "return my order 9419472006"
+     */
     private static final Pattern ORDER_PATTERN = Pattern.compile(
+            // ── Alt 1: explicit tracking keywords ─────────────────────────────
+            // Exclude exact action keywords
+            "(?!.*\\b(cancel|return|exchange|refund)\\b)" +
+            // Exclude personal intent phrases (catches action-word typos too)
+            "(?!.*\\b(i\\s+want\\s+to|i\\s+need\\s+to|i\\s+would\\s+like\\s+to|can\\s+i|how\\s+can\\s+i|how\\s+do\\s+i)\\b)" +
+            // Exclude ORDER_LISTING territory — "my order history", "show my orders", etc.
+            "(?!.*\\b(history|orders|past\\s+order|all\\s+order|recent\\s+purchase|order\\s+history)\\b)" +
             ".*\\b(track|order\\s*status|where.*order|order.*detail|check.*order|" +
-            "my\\s*order\\s+\\d|order\\s+\\d|\\d{7,12})\\b.*",
+            "my\\s*order\\s+\\d|order\\s+\\d|my\\s+order)\\b.*" +
+            // ── Alt 2: bare order number — nothing else in the message ─────────
+            "|\\s*\\d{7,12}\\s*",
             Pattern.CASE_INSENSITIVE
     );
 

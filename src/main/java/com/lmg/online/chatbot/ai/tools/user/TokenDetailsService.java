@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
 
 
 /**
@@ -46,34 +48,45 @@ public class TokenDetailsService {
      * @return {@link UserWsDTO} populated with the user's profile data
      */
     public UserWsDTO getTokenDetails(String concept, String env, String token, String appId) {
-
-        // Build: {baseUrl}/landmarkshopscommercews/v2/{siteId}/chatbot/getTokenDetails
-        //        ?appId={appId}&token={token}
-        // Uses buildTokenDetailsUrl (not buildApiUrl) to guarantee the token is
-        // encoded exactly once — even if it arrives already percent-encoded.
-        String url = ConceptBaseUrlResolver.buildTokenDetailsUrl(concept, env, token, appId);
-
-        log.info("🔑 getTokenDetails → concept={}, env={}, appId={}", concept, env, appId);
-
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         try {
-            // Use URI-based call to prevent RestTemplate from re-encoding
-            // already percent-encoded characters in the token (%3D → %253D).
-            URI uri = ConceptBaseUrlResolver.buildTokenDetailsUri(concept, env, token, appId);
-            log.info("🌐 Token details URI → {}", uri);
+            // Build the base URL with template placeholders
+            String baseUrl = ConceptBaseUrlResolver.getEnvBaseUrl(concept, env)
+                    + "/landmarkshopscommercews/v2/{conceptPath}/chatbot/getTokenDetails"
+                    + "?appId={appId}&token={token}";
 
-            UserWsDTO userWsDTO = restTemplate
-                    .exchange(uri, HttpMethod.POST, new HttpEntity<>(null, headers), UserWsDTO.class)
-                    .getBody();
+            log.info("🌐 Token details URL (template) → {}", baseUrl);
+            log.info("🔑 Token being sent → {}", token); // pass token as-is
 
-            log.info("✅ getTokenDetails succeeded – uid={}", userWsDTO != null ? userWsDTO.getUid() : "null");
+            // Wrap headers (no body needed)
+            HttpEntity<?> entity = new HttpEntity<>(null, headers);
+
+            // Build URI manually to prevent RestTemplate from re-encoding the token
+            String fullUrlString = baseUrl
+                    .replace("{conceptPath}", concept.toLowerCase() + "in")
+                    .replace("{appId}", appId)
+                    .replace("{token}", token); // token already encoded, do NOT change
+            URI uri = new URI(fullUrlString);
+
+            // Make the POST call
+            UserWsDTO userWsDTO = restTemplate.exchange(
+                    uri,
+                    HttpMethod.POST,
+                    entity,
+                    UserWsDTO.class
+            ).getBody();
+
+            log.info("✅ getTokenDetails succeeded – uid={}",
+                    userWsDTO != null ? userWsDTO.getUid() : "null");
             return userWsDTO;
 
         } catch (Exception e) {
-            log.error("❌ getTokenDetails failed for concept={}, env={}: {}", concept, env, e.getMessage(), e);
+            log.error("❌ getTokenDetails failed for concept={}, env={}: {}",
+                    concept, env, e.getMessage(), e);
             throw new RuntimeException("Error fetching token details: " + e.getMessage(), e);
         }
+
     }
 }

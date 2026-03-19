@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 /**
  * REST controller that resolves a commerce-platform token to a user profile.
@@ -60,13 +62,17 @@ public class TokenDetailsController {
     public ResponseEntity<UserWsDTO> getTokenDetails(
             @Valid @RequestBody TokenDetailsRequest request) {
 
-        log.info("📨 token-details → concept={}, env={}, appId={} token={}",
-                request.getConcept(), request.getEnv(), request.getAppId(),request.getToken());
+
+
+
+        String encodedToken = URLEncoder.encode(request.getToken(), StandardCharsets.UTF_8);
+        log.info("📨 token-details → concept={}, env={}, appId={} token={} encodedToken={}",
+                request.getConcept(), request.getEnv(), request.getAppId(),request.getToken(),encodedToken);
 
         UserWsDTO userWsDTO = tokenDetailsService.getTokenDetails(
                 request.getConcept(),
                 request.getEnv(),
-                request.getToken(),
+                encodedToken,
                 request.getAppId()
         );
 
