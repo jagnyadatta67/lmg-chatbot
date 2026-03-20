@@ -635,7 +635,7 @@
         border: 1px solid #e5e7eb; flex-shrink: 0;
         background: #f3f4f6;
       }
-      /* Product rows inside a single-order tracking card */
+      /* Product rows inside order cards (listing + tracking) */
       .order-products-detail { margin: 8px 0; }
       .order-product-row {
         display: flex; align-items: flex-start; gap: 8px;
@@ -645,26 +645,23 @@
       .order-product-meta {
         font-size: 11px; color: #444; line-height: 1.6; flex: 1;
       }
+      /* Entry row separator — used by renderOrderEntryRow */
       .order-entry-row {
         display: flex; align-items: flex-start; gap: 10px;
-        padding: 9px 0; border-top: 1px solid #e8e8e8;
+        padding: 9px 0;
+        border-top: 1px solid #e8e8e8;
       }
+      .order-entry-row:first-child { border-top: 1px solid #e8e8e8; }
       .order-entries-wrapper {
-        margin-top: 6px; border-bottom: 1px solid #e0e0e0; padding-bottom: 2px;
+        margin-top: 6px;
+        border-bottom: 1px solid #e0e0e0;
+        padding-bottom: 2px;
       }
       .order-card-actions {
-        display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
+        display: flex; gap: 6px; flex-wrap: wrap;
         justify-content: flex-end;
+        margin-top: 8px;
       }
-      .order-btn-more {
-        background: white; border: 1.5px solid #1a1a1a; color: #1a1a1a;
-        font-size: 11px; padding: 5px 10px; border-radius: 8px; cursor: pointer;
-        font-weight: 600; transition: all .18s; align-self: center;
-        white-space: nowrap; flex-shrink: 0;
-      }
-      .order-btn-more:hover { background: #1a1a1a12; }
-      .order-btn-detail { background: linear-gradient(135deg, ${theme.primary}, ${theme.secondary}); color: white; }
-      .order-btn-detail:hover { opacity: 0.88; transform: translateY(-1px); }
       .order-btn {
         padding: 8px 12px;
         border: none; border-radius: 8px;
@@ -676,6 +673,73 @@
       .order-btn-primary:hover  { opacity: 0.88; transform: translateY(-1px); }
       .order-btn-secondary { background: white; border: 1.5px solid ${theme.primary}; color: ${theme.primary}; }
       .order-btn-secondary:hover { background: ${theme.primary}12; }
+      .order-btn-detail {
+        background: white; border: 1.5px solid #607d8b; color: #607d8b;
+        font-size: 11px; padding: 5px 10px; border-radius: 8px; cursor: pointer;
+        font-weight: 600; transition: all .18s;
+      }
+      .order-btn-detail:hover { background: #607d8b14; }
+      .order-btn-more {
+        background: white; border: 1.5px solid #1a1a1a; color: #1a1a1a;
+        font-size: 11px; padding: 5px 10px; border-radius: 8px; cursor: pointer;
+        font-weight: 600; transition: all .18s; align-self: center; white-space: nowrap; flex-shrink: 0;
+      }
+      .order-btn-more:hover { background: #1a1a1a12; }
+
+      /* ── Order Entry Detail Card ─────────────────────────────────────────── */
+      .entry-detail-card {
+        background: white;
+        border: 1px solid ${theme.primary}44;
+        border-top: 3px solid ${theme.primary};
+        border-radius: 14px;
+        padding: 14px;
+        margin-top: 8px;
+        box-shadow: 0 3px 12px rgba(0,0,0,0.07);
+        font-size: 12.5px;
+      }
+      .entry-product-header {
+        display: flex; align-items: center; gap: 10px;
+        padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; margin-bottom: 10px;
+      }
+      .entry-product-img {
+        width: 54px; height: 54px; object-fit: cover;
+        border-radius: 8px; border: 1px solid #eee; flex-shrink: 0;
+      }
+      .entry-product-name { font-weight: 700; color: #1a1a1a; font-size: 13px; line-height: 1.4; }
+      .entry-product-code { font-size: 11px; color: #888; margin-top: 2px; }
+      .entry-order-code   { font-size: 11px; color: #888; }
+      .entry-section {
+        margin-top: 10px; padding-top: 10px;
+        border-top: 1px solid #f3f4f6;
+      }
+      .entry-section-title {
+        font-weight: 700; font-size: 11px; text-transform: uppercase;
+        letter-spacing: .6px; color: ${theme.primary}; margin-bottom: 7px;
+      }
+      .entry-detail-row {
+        display: flex; justify-content: space-between;
+        padding: 4px 0; border-bottom: 1px solid #fafafa;
+        font-size: 12px; color: #555; line-height: 1.5;
+      }
+      .entry-detail-row:last-child { border-bottom: none; }
+      .entry-detail-row span { color: #888; flex-shrink: 0; margin-right: 8px; }
+      .entry-tat-alert {
+        background: #fff3e0; border-left: 3px solid #ff9800;
+        border-radius: 6px; padding: 7px 10px;
+        font-size: 12px; color: #e65100; margin: 8px 0; font-weight: 600;
+      }
+      .entry-tat-alert.pickup { border-color: #e53935; background:#ffebee; color:#b71c1c; }
+      .entry-eligibility {
+        display: flex; gap: 10px; flex-wrap: wrap;
+        margin-top: 10px; padding-top: 8px;
+        border-top: 1px solid #f3f4f6;
+        font-size: 12px; color: #555;
+      }
+      .entry-faq-link {
+        color: ${theme.primary}; font-weight: 600; text-decoration: none;
+        font-size: 12px;
+      }
+      .entry-faq-link:hover { text-decoration: underline; }
 
       /* ── Profile Card ───────────────────────────────────────────────────── */
       .profile-card {
@@ -1088,7 +1152,7 @@
         try {
           const res = await fetch(`${backendBase}/api/support/ticket`, {
             method:  "POST",
-            headers: { "Content-Type": "application/json", "X-API-Key": config.apikey },
+            headers: { "Content-Type": "application/json"},
             body: JSON.stringify({
               ...ticketData,
               concept: config.concept,
@@ -1208,8 +1272,9 @@
       POLICY_QUESTION:    handleGeneralIntent,
       GENERAL_QUERY:      handleGeneralIntent,
       ORDER_TRACKING:     handleOrderTracking,
-      ORDER_ENTRY_INTENT: handleOrderEntryDetail,
       CANCEL_OR_RETURN:   handleCancelOrReturn,
+      ORDER_ENTRY_INTENT:    handleOrderEntryDetail,
+      RETURN_STATUS_DETAIL:  handleReturnStatusResponse,
       CUSTOMER_PROFILE:   handleCustomerProfile,
       ORDER_LISTING:      handleChatbotOrderList,
       DELIVERY_TRACKING:  handleDeliveryTrackingResponse,
@@ -1374,72 +1439,16 @@
           renderBotMessage(`✅ <b>Ticket raised!</b><br>Reference: <b>${data.ticketId}</b><br>We'll get back to you within 24 hours.`)
         }
         renderBackToMenu()
+        enableInput("Type your message...")
       })
     }
 
 
     /**
-     * Renders one order entry row — shared by ORDER_TRACKING and ORDER_LISTING cards.
-     * Shows product image, code (clickable), qty, return/exchange badges, More Details btn.
-     */
-    function renderOrderEntryRow(entry, orderNo) {
-      const img    = entry.resolvedProductImage || entry.productImage || null
-      const relUrl = entry.resolvedProductUrl   || entry.productUrl   || null
-      const productUrl = relUrl ? `${window.location.origin}${relUrl}` : null
-      const name   = entry.resolvedProductName  || entry.productName  || null
-      const code   = entry.productCode || "—"
-      const qty    = entry.quantity    || 1
-      const pk     = entry.orderEntryPk || ""
-
-      const imgHtml = img
-        ? `<img src="${img}" alt="Product" class="order-product-thumb"
-               style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;"
-               onerror="this.style.display='none'">`
-        : `<div style="width:44px;height:44px;background:#f0f0f0;border-radius:6px;flex-shrink:0;"></div>`
-
-      const nameHtml = name
-        ? `<div style="font-weight:600;font-size:0.82em;color:#222;line-height:1.3;">${name}</div>`
-        : ""
-
-      const codeHtml = productUrl
-        ? `<a href="${productUrl}" target="_blank"
-              style="font-size:0.75em;color:#c8972b;text-decoration:none;">${code}</a>`
-        : `<span style="font-size:0.75em;color:#888;">${code}</span>`
-
-      const returnBadge = entry.returnable
-        ? `<span style="color:#43a047;font-size:0.75em;">✅ Returnable</span>`
-        : `<span style="color:#9e9e9e;font-size:0.75em;">❌ Not Returnable</span>`
-      const exchBadge = entry.exchangeable
-        ? `<span style="color:#43a047;font-size:0.75em;">✅ Exchangeable</span>`
-        : `<span style="color:#9e9e9e;font-size:0.75em;">❌ Not Exchangeable</span>`
-
-      const moreBtn = pk
-        ? `<button class="order-btn order-btn-more"
-              data-intent="ORDER_ENTRY_INTENT"
-              data-order-no="${orderNo}"
-              data-entry-pk="${pk}">🔍 More Details</button>`
-        : ""
-
-      return `
-        <div class="order-entry-row">
-          ${imgHtml}
-          <div style="flex:1;min-width:0;">
-            ${nameHtml}
-            ${codeHtml}
-            <div style="font-size:0.78em;color:#666;margin-top:2px;">Qty: ${qty}</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
-              ${returnBadge}
-              ${exchBadge}
-            </div>
-          </div>
-          ${moreBtn}
-        </div>`
-    }
-
-    /**
      * Shared helper — renders a single-order detail card into the chat body.
-     * Accepts a single OrderSummary object: { orderNo, orderStatus, orderDate,
-     * orderAmount, numberOfShipments, numberOfProductsDelivered, entries[] }
+     * Accepts a single OrderSummary object from the new chatbot order API.
+     * Shape: { orderNo, orderStatus, orderDate, orderAmount,
+     *          numberOfShipments, numberOfProductsDelivered, entries[] }
      * Returns true if a card was rendered, false if entries were empty.
      */
     function renderSingleOrderCard(order) {
@@ -1492,8 +1501,83 @@
     }
 
     /**
-     * Renders the ORDER_TRACKING response.
-     * Shape: { chat_message, needsOrderNumber, orders: [{ orderNo, orderStatus, ... entries[] }] }
+     * Event delegation for "More Details" buttons injected by renderSingleOrderCard.
+     * Buttons are rendered as HTML strings (not DOM nodes), so we can't attach
+     * listeners directly — instead we listen on chatBody and filter by data-intent.
+     *
+     * async/await ensures the button state is updated AFTER the backend responds,
+     * preventing buttons from being permanently stuck at "Loading…".
+     */
+    chatBody.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-intent='ORDER_ENTRY_INTENT']")
+      if (!btn) return
+      e.stopPropagation()
+
+      const orderNo = btn.dataset.orderNo
+      const entryPk = btn.dataset.entryPk
+      if (!orderNo || !entryPk) return
+
+      renderUserMessage(`Fetching details for item ${entryPk}`)
+      await sendMessageWithIntent("ORDER_ENTRY_INTENT", `entry details ${entryPk}`, {
+        orderNo,
+        entryPk,
+      })
+    })
+
+    /**
+     * Event delegation — "↩️ Return Status" buttons (RETURN_STATUS_DETAIL intent).
+     */
+    chatBody.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-intent='RETURN_STATUS_DETAIL']")
+      if (!btn) return
+      e.stopPropagation()
+
+      const orderNo = btn.dataset.orderNo
+      const rmaNo   = btn.dataset.rmaNo
+      if (!orderNo || !rmaNo) return
+
+      renderUserMessage(`Fetching return status for RMA ${rmaNo}`)
+      await sendMessageWithIntent("RETURN_STATUS_DETAIL", `return status ${rmaNo}`, {
+        orderNo,
+        rmaNo,
+      })
+    })
+
+    /**
+     * Event delegation — "View Order" inline button (ORDER_TRACKING_INLINE).
+     *
+     * Fires ORDER_TRACKING with the card's orderNo pinned via intentHint so the
+     * result renders in-chat. Button shows "Loading…" during the call and
+     * restores to "View Order" afterward (re-clickable, unlike "More Details").
+     */
+    chatBody.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-intent='ORDER_TRACKING_INLINE']")
+      if (!btn) return
+      e.stopPropagation()
+
+      if (btn.disabled) return
+
+      const orderNo = btn.dataset.orderNo
+      if (!orderNo) return
+
+      btn.disabled    = true
+      btn.textContent = "Loading…"
+
+      try {
+        renderUserMessage(`Track order ${orderNo}`)
+        await sendMessageWithIntent("ORDER_TRACKING", orderNo, { orderNo, intentHint: "ORDER_TRACKING" })
+      } finally {
+        // Always restore so user can re-click (e.g. to refresh status)
+        btn.disabled    = false
+        btn.textContent = "View Order"
+      }
+    })
+
+    /**
+     * Renders the ChatbotOrderTrackingResponse returned by ORDER_TRACKING intent.
+     * Shape: { chat_message, needsOrderNumber, customerId, orders[] }
+     * Each order: { orderNo, orderStatus, orderDate, orderAmount,
+     *               numberOfShipments, numberOfProductsDelivered, entries[] }
      */
     function handleOrderTracking(payload) {
       if (checkAndTriggerLogin(payload, "Please sign in to track your orders.")) return
@@ -1515,9 +1599,11 @@
         return
       }
 
+      // Render the first order from the orders array
       const orders  = Array.isArray(payload.orders) ? payload.orders : []
       const order   = orders[0]
       const rendered = order ? renderSingleOrderCard(order) : false
+
       if (!rendered) {
         renderBotMessage("📦 No order details found. Please check the order number and try again.")
       }
@@ -1562,6 +1648,178 @@
       if (!payload.policyText && payload.chat_message && payload.chat_message.trim() !== "") {
         renderBotMessage(payload.chat_message)
       }
+
+      renderBackToMenu()
+      enableInput("Type your message...")
+    }
+
+    /**
+     * Renders the OrderEntryDetailResponse returned by ORDER_ENTRY_INTENT.
+     * Triggered when the user clicks "More Details" on a product row in the order card.
+     *
+     * Shape: {
+     *   chat_message, orderNo, productCode, productImageUrl, productUrl,
+     *   exchangeable, returnable,
+     *   item_details: [{ position, quantity, status, consignment, returnDetail }]
+     * }
+     *
+     * UI layout per item_detail:
+     *   1. Product header  — image + product code + order number
+     *   2. TAT / dispatch alerts (if applicable)
+     *   3. Consignment section — code, status, shipped, delivered, qty, return window
+     *   4. Return section  — shown only when returnDetail is present
+     *   5. Eligibility footer — ✅/❌ returnable + exchangeable
+     *   6. [Future] Action button placeholder
+     */
+    function handleOrderEntryDetail(payload) {
+      if (checkAndTriggerLogin(payload, "Please sign in to view item details.")) return
+
+      // Error / no data
+      const chatMsg = (payload?.chat_message || "").trim()
+      if (chatMsg) {
+        renderBotMessage(chatMsg)
+        renderBackToMenu()
+        enableInput("Type your message...")
+        return
+      }
+
+      const items = Array.isArray(payload?.item_details) ? payload.item_details : []
+      if (items.length === 0) {
+        renderBotMessage("No delivery details found for this item. Please try again.")
+        renderBackToMenu()
+        enableInput("Type your message...")
+        return
+      }
+
+      // ── Product header (shared across all item_details) ───────────────────
+      const productImg   = payload.productImageUrl
+        ? `<img src="${payload.productImageUrl}" class="entry-product-img"
+               onerror="this.style.display='none'" alt="Product">`
+        : ""
+      const productName  = payload.productName || ""
+      const productCode  = payload.productCode  ? `<div class="entry-product-code">Code: ${payload.productCode}</div>` : ""
+      const orderCodeHtml = payload.orderNo ? `<div class="entry-order-code">Order #${payload.orderNo}</div>` : ""
+      const productLink  = payload.productUrl
+        ? `<a href="${payload.productUrl}" target="_blank" style="text-decoration:none;">${productImg}</a>`
+        : productImg
+
+      // ── One card per item_detail ──────────────────────────────────────────
+      items.forEach(item => {
+        const cons  = item.consignment  || null   // null = not yet shipped
+        const ret   = item.returnDetail || null   // null = no return initiated
+
+        const hasCons = !!(cons && cons.consignmentCode)
+        const hasRet  = !!(ret  && ret.returnInitiated)
+
+        // Product header — shared across all three cases
+        const header = `
+          <div class="entry-product-header">
+            ${productLink}
+            <div>
+              ${productName ? `<div class="entry-product-name">${productName}</div>` : ""}
+              ${productCode}
+              ${orderCodeHtml}
+            </div>
+          </div>`
+
+        // Eligibility footer — always shown
+        const eligibility = `
+          <div class="entry-eligibility">
+            <span>${payload.returnable   ? "✅ Returnable"   : "❌ Not Returnable"}</span>
+            <span>${payload.exchangeable ? "✅ Exchangeable" : "❌ Not Exchangeable"}</span>
+          </div>`
+
+        // ─── CASE 1: No consignment — order placed, not yet shipped ──────────
+        if (!hasCons && !hasRet) {
+          chatBody.innerHTML += `
+            <div class="entry-detail-card">
+              ${header}
+              <div class="entry-section">
+                <div class="entry-detail-row"><span>Status</span><b>${item.status || "—"}</b></div>
+                <div class="entry-detail-row"><span>Qty</span><b>${item.quantity || 1}</b></div>
+              </div>
+              ${eligibility}
+            </div>`
+          chatBody.scrollTop = chatBody.scrollHeight
+          return
+        }
+
+        // ─── CASE 2: Consignment only — shipped/delivered, no return ─────────
+        if (hasCons && !hasRet) {
+          const shippedFmt = cons.shippedDate        ? new Date(cons.shippedDate).toLocaleDateString("en-IN")        : null
+          const delivFmt   = cons.actualDeliveryDate ? new Date(cons.actualDeliveryDate).toLocaleDateString("en-IN") : null
+
+          const tatAlert  = cons.deliveryTatBreached
+            ? `<div class="entry-tat-alert">⚠️ Delivery exceeded the promised timeframe — please contact support.</div>` : ""
+          const dispAlert = cons.dispatchDelayed
+            ? `<div class="entry-tat-alert">⏳ Dispatch is running later than expected. We'll update you soon.</div>` : ""
+
+          chatBody.innerHTML += `
+            <div class="entry-detail-card">
+              ${header}
+              ${tatAlert}${dispAlert}
+              <div class="entry-section">
+                <div class="entry-section-title">📦 Consignment</div>
+                <div class="entry-detail-row"><span>Status</span><b>${cons.consignmentStatus || item.status || "—"}</b></div>
+                ${cons.consignmentCode ? `<div class="entry-detail-row"><span>Tracking #</span><b>${cons.consignmentCode}</b></div>` : ""}
+                ${shippedFmt          ? `<div class="entry-detail-row"><span>Shipped</span><b>${shippedFmt}</b></div>`              : ""}
+                ${delivFmt            ? `<div class="entry-detail-row"><span>Delivered</span><b>${delivFmt}</b></div>`              : ""}
+                <div class="entry-detail-row"><span>Qty Shipped</span><b>${cons.quantityShipped ?? item.quantity ?? "—"}</b></div>
+                <div class="entry-detail-row">
+                  <span>Return Window</span>
+                  <b style="color:${cons.returnWindowExpired ? '#e53935' : '#43a047'}">
+                    ${cons.returnWindowExpired ? "Expired" : "Open"}
+                  </b>
+                </div>
+              </div>
+              ${eligibility}
+            </div>`
+          chatBody.scrollTop = chatBody.scrollHeight
+          return
+        }
+
+        // ─── CASE 3: Consignment + returnDetail — return initiated ────────────
+        // Delivery context shown briefly; return section is the main focus.
+        // Alerts: returnPickupDelayed first (most prominent), then tatBreached.
+        const pickupAlert = ret.returnPickupDelayed
+          ? `<div class="entry-tat-alert pickup">⚠️ Return pickup is delayed — allow approximately <b>2 more days</b>. We apologise for the inconvenience.</div>`
+          : ""
+        const tatAlert = cons && cons.deliveryTatBreached
+          ? `<div class="entry-tat-alert">⚠️ Delivery exceeded the promised timeframe.</div>`
+          : ""
+
+        const retDateFmt = ret.returnCreationDate
+          ? new Date(ret.returnCreationDate).toLocaleDateString("en-IN") : null
+
+        const faqHtml = ret.faqLink
+          ? `<div class="entry-detail-row"><span>FAQ</span><a href="${ret.faqLink}" target="_blank" class="entry-faq-link">📋 Return Help</a></div>`
+          : ""
+
+        chatBody.innerHTML += `
+          <div class="entry-detail-card">
+            ${header}
+            ${pickupAlert}
+            ${tatAlert}
+            <div class="entry-section">
+              <div class="entry-detail-row">
+                <span>Delivery Status</span>
+                <b>${cons ? (cons.consignmentStatus || item.status || "—") : (item.status || "—")}</b>
+              </div>
+              ${cons && cons.consignmentCode ? `<div class="entry-detail-row"><span>Tracking #</span><b>${cons.consignmentCode}</b></div>` : ""}
+            </div>
+            <div class="entry-section">
+              <div class="entry-section-title">🔄 Return Details</div>
+              ${ret.returnStatus ? `<div class="entry-detail-row"><span>Return Status</span><b>${ret.returnStatus}</b></div>` : ""}
+              ${ret.returnId     ? `<div class="entry-detail-row"><span>Return ID</span><b>${ret.returnId}</b></div>`         : ""}
+              ${ret.rma          ? `<div class="entry-detail-row"><span>RMA #</span><b>${ret.rma}</b></div>`                  : ""}
+              ${retDateFmt       ? `<div class="entry-detail-row"><span>Raised On</span><b>${retDateFmt}</b></div>`           : ""}
+              ${faqHtml}
+            </div>
+            ${eligibility}
+          </div>`
+
+        chatBody.scrollTop = chatBody.scrollHeight
+      })
 
       renderBackToMenu()
       enableInput("Type your message...")
@@ -1777,10 +2035,13 @@
             <div class="order-card-meta"><strong>Qty:</strong> ${o.qty || 1} | <strong>Net:</strong> ${o.netAmount || "-"}</div>
             <div class="order-card-meta"><strong>Order #:</strong> ${orderNumber}</div>
             <div class="order-card-actions">
-              <a href="${orderUrl}" target="_blank" style="text-decoration:none;">
-                <button class="order-btn order-btn-primary">View Order</button>
-              </a>
+              <button class="order-btn order-btn-primary"
+                data-intent="ORDER_TRACKING_INLINE"
+                data-order-no="${orderNumber}">View Order</button>
               <button class="order-btn order-btn-secondary" onclick="copyToClipboard('${orderNumber}')">Copy Order #</button>
+              <a href="${orderUrl}" target="_blank" style="text-decoration:none;">
+                <button class="order-btn order-btn-detail" style="font-size:0.78em;padding:5px 10px;">View Order Details ↗</button>
+              </a>
             </div>
             ${o.orderAmount ? `<div class="order-card-meta"><strong>Amount:</strong> ₹${o.orderAmount}</div>` : ""}
             ${o.estmtDate ? `<div class="order-card-meta"><strong>ETA:</strong> ${o.estmtDate}</div>` : ""}
@@ -1973,7 +2234,7 @@
       WRITE_US:            () => { handleWriteUs({}) },
 
       // ── Auth-required (gate shows instantly for anonymous users) ──────────
-      TRACK_ORDER:         async () => { await handleOrderListingMenu() },   // same as Order History
+      TRACK_ORDER:         async () => { await handleOrderTrackMenu() },
       ORDER_LISTING:       async () => { await handleOrderListingMenu() },
       DELIVERY_TRACKING:   async () => { await handleDeliveryTrackingMenu() },
       RETURN_STATUS:       async () => { await handleReturnStatusMenu() },
@@ -2031,11 +2292,12 @@
 
     /**
      * ORDER_TRACKING menu entry-point.
-     * Now shows the order list (same as Order History) —
-     * backend returns OrderListResponse for both ORDER_TRACKING and ORDER_LISTING.
+     * Prompts the user for an order number, then sends ORDER_TRACKING intent.
      */
     async function handleOrderTrackMenu() {
-      await handleOrderListingMenu()
+      renderBotMessage("📦 Please enter your order number and I'll fetch the details for you.")
+      openOrderInput("Enter order number (e.g. 9419396447)...", (msg) =>
+        sendMessageWithIntent("ORDER_TRACKING", msg, { orderNo: msg }))
     }
 
 
@@ -2135,8 +2397,70 @@
     }
 
     /**
-     * Renders the ChatbotOrderListResponse returned by the ORDER_LISTING intent.
-     * Expected shape: { orders: [{ orderNo, orderStatus, orderDate, orderAmount, entries[] }], chatMessage }
+     * Maps raw Hybris order status codes to user-friendly labels.
+     */
+    /**
+     * Renders one order entry row — shared by ORDER_LISTING and ORDER_TRACKING cards.
+     * Shows product image, code (clickable), qty, return/exchange badges, More Details btn.
+     */
+    function renderOrderEntryRow(entry, orderNo) {
+      const img    = entry.resolvedProductImage || entry.productImage || null
+      const relUrl = entry.resolvedProductUrl   || entry.productUrl   || null
+      const productUrl = relUrl ? `${window.location.origin}${relUrl}` : null
+      const name   = entry.resolvedProductName  || entry.productName  || null
+      const code   = entry.productCode || "—"
+      const qty    = entry.quantity    || 1
+      const pk     = entry.orderEntryPk || ""
+
+      const imgHtml = img
+        ? `<img src="${img}" alt="Product" class="order-product-thumb"
+               style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;"
+               onerror="this.style.display='none'">`
+        : `<div style="width:44px;height:44px;background:#f0f0f0;border-radius:6px;flex-shrink:0;"></div>`
+
+      const nameHtml = name
+        ? `<div style="font-weight:600;font-size:0.82em;color:#222;line-height:1.3;">${name}</div>`
+        : ""
+
+      const codeHtml = productUrl
+        ? `<a href="${productUrl}" target="_blank"
+              style="font-size:0.75em;color:#c8972b;text-decoration:none;">${code}</a>`
+        : `<span style="font-size:0.75em;color:#888;">${code}</span>`
+
+      const returnBadge = entry.returnable
+        ? `<span style="color:#43a047;font-size:0.75em;">✅ Returnable</span>`
+        : `<span style="color:#9e9e9e;font-size:0.75em;">❌ Not Returnable</span>`
+      const exchBadge = entry.exchangeable
+        ? `<span style="color:#43a047;font-size:0.75em;">✅ Exchangeable</span>`
+        : `<span style="color:#9e9e9e;font-size:0.75em;">❌ Not Exchangeable</span>`
+
+      const moreBtn = pk
+        ? `<button class="order-btn order-btn-more"
+              data-intent="ORDER_ENTRY_INTENT"
+              data-order-no="${orderNo}"
+              data-entry-pk="${pk}">🔍 More Details</button>`
+        : ""
+
+      return `
+        <div class="order-entry-row">
+          ${imgHtml}
+          <div style="flex:1;min-width:0;">
+            ${nameHtml}
+            ${codeHtml}
+            <div style="font-size:0.78em;color:#666;margin-top:2px;">Qty: ${qty}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+              ${returnBadge}
+              ${exchBadge}
+            </div>
+          </div>
+          ${moreBtn}
+        </div>`
+    }
+
+    /**
+     * Renders the ORDER_LISTING response.
+     * Shape: { orders: [{ orderNo, orderStatus, orderDate, orderAmount,
+     *                     numberOfShipments, numberOfProductsDelivered, entries[] }] }
      */
     function handleChatbotOrderList(payload) {
       if (checkAndTriggerLogin(payload, "Please sign in to view your order history.")) return
@@ -2148,12 +2472,12 @@
         return
       }
 
-      // Accept both "orders" (chatbot endpoint) and "orderDataList" (standard Hybris API)
       const orders = Array.isArray(payload.orders)
         ? payload.orders
         : Array.isArray(payload.orderDataList)
           ? payload.orderDataList
           : []
+
       if (orders.length === 0) {
         renderBotMessage("📦 No orders found in your history.")
         renderBackToMenu()
@@ -2161,45 +2485,28 @@
         return
       }
 
-      renderBotMessage("<b>📋 Your Order History:</b>")
+      renderBotMessage(`<b>📋 Your Order History (${orders.length} order${orders.length !== 1 ? "s" : ""}):</b>`)
+
       orders.forEach((o) => {
-        // Support both simplified chatbot fields and standard Hybris field names
-        const orderNo  = o.orderNo  || o.code  || "N/A"
-        const status   = o.orderStatus || o.statusDisplay || o.status || "Unknown"
-        const rawDate  = o.orderDate  || o.created
-        const date     = rawDate ? new Date(rawDate).toLocaleDateString() : "N/A"
+        const orderNo  = o.orderNo || o.code || "N/A"
+        const status   = o.orderStatus || o.statusDisplay || o.status || ""
+        const rawDate  = o.orderDate || o.created
+        const date     = rawDate ? new Date(rawDate).toLocaleDateString("en-IN") : "N/A"
         const amount   = o.orderAmount != null
-          ? `₹${o.orderAmount}`
-          : (o.totalPrice?.value != null ? `₹${o.totalPrice.value}` : "N/A")
+          ? `₹ ${Number(o.orderAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+          : (o.totalPrice?.value != null ? `₹ ${o.totalPrice.value}` : "N/A")
         const orderUrl = `${window.location.origin}/in/en/my-account/order/${orderNo}`
 
-        // Build product thumbnails strip from entries[]
-        // Resolves image from either:
-        //   1. entry.productImage          (chatbot-simplified endpoint)
-        //   2. entry.resolvedProductImage  (Java helper serialised by Spring)
-        //   3. entry.product.images[0].url (standard Hybris order API)
-        const entries = Array.isArray(o.entries) ? o.entries : []
-        const resolveImg = (e) =>
-          e.productImage
-          || e.resolvedProductImage
-          || e.product?.images?.[0]?.url
-          || null
-        const resolveUrl = (e) => {
-          const rel = e.productUrl || e.resolvedProductUrl || e.product?.url
-          return rel ? `${window.location.origin}${rel}` : orderUrl
-        }
-
-        const thumbEntries = entries.filter(e => resolveImg(e)).slice(0, 5)
-        const thumbsHtml = thumbEntries.length > 0
-          ? `<div class="order-products-strip">` +
-            thumbEntries.map(e =>
-              `<a href="${resolveUrl(e)}" target="_blank" title="View product">` +
-                `<img src="${resolveImg(e)}" alt="Product" class="order-product-thumb" ` +
-                     `onerror="this.style.display='none'">` +
-              `</a>`
-            ).join("") +
-            `</div>`
+        const ships     = o.numberOfShipments
+        const delivered = o.numberOfProductsDelivered
+        const shipInfo  = (ships != null && delivered != null)
+          ? `<div class="order-card-meta" style="margin-top:2px;">
+               📦 ${ships} shipment${ships !== 1 ? "s" : ""} &nbsp;·&nbsp; ${delivered} item${delivered !== 1 ? "s" : ""} delivered
+             </div>`
           : ""
+
+        const entries    = Array.isArray(o.entries) ? o.entries : []
+        const entriesHtml = entries.map(e => renderOrderEntryRow(e, orderNo)).join("")
 
         chatBody.innerHTML += `
           <div class="order-card">
@@ -2208,18 +2515,21 @@
                 <div class="order-card-title">Order #${orderNo}</div>
                 <span class="order-status-badge">${status}</span>
               </div>
-              ${thumbsHtml}
-              <div class="order-card-meta"><strong>Date:</strong> ${date}</div>
-              <div class="order-card-meta"><strong>Amount:</strong> ${amount}</div>
+              <div class="order-card-meta">
+                <strong>Date:</strong> ${date} &nbsp;·&nbsp; <strong>Amount:</strong> ${amount}
+              </div>
+              ${shipInfo}
+              <div class="order-entries-wrapper">${entriesHtml}</div>
               <div class="order-card-actions">
+                <button class="order-btn order-btn-secondary" style="font-size:11px;padding:5px 10px;min-height:30px;" onclick="copyToClipboard('${orderNo}')">Copy #</button>
                 <a href="${orderUrl}" target="_blank" style="text-decoration:none;">
-                  <button class="order-btn order-btn-primary">View Order</button>
+                  <button class="order-btn order-btn-detail" style="font-size:11px;padding:5px 10px;">View Order Details ↗</button>
                 </a>
-                <button class="order-btn order-btn-secondary" onclick="copyToClipboard('${orderNo}')">Copy #</button>
               </div>
             </div>
           </div>`
       })
+
       chatBody.scrollTop = chatBody.scrollHeight
       renderBackToMenu()
       enableInput("Type your message...")
@@ -2326,7 +2636,7 @@
           <div class="order-card-content">
             <div class="order-card-header">
               <div class="order-card-title">RMA #${payload.rma || "N/A"}</div>
-              <span class="order-status-badge">${payload.returnStatus || "Unknown"}</span>
+              ${payload.returnStatus ? `<span class="order-status-badge">${payload.returnStatus}</span>` : ""}
             </div>
             ${payload.consignmentCode ? `<div class="order-card-meta"><strong>Consignment:</strong> ${payload.consignmentCode}</div>` : ""}
             <div class="order-card-meta"><strong>Created:</strong> ${returnDate}</div>
@@ -2334,120 +2644,6 @@
             ${payload.faqLink ? `<div class="order-card-meta"><a href="${payload.faqLink}" target="_blank" style="color:${theme.primary};font-weight:600;">📖 Return FAQ</a></div>` : ""}
           </div>
         </div>`
-      chatBody.scrollTop = chatBody.scrollHeight
-      renderBackToMenu()
-      enableInput("Type your message...")
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // ORDER ENTRY DETAIL  (response renderer for "🔍 More Details" button)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Renders the OrderEntryDetailResponse returned by ORDER_ENTRY_INTENT.
-     * Shape: { productName, productCode, productImageUrl, productUrl,
-     *          orderNo, orderEntryPk, returnable, exchangeable,
-     *          item_details: [{ position, quantity, status,
-     *            consignment: { consignmentCode, consignmentStatus, shippedDate,
-     *                           actualDeliveryDate, deliveryTatBreached, dispatchDelayed },
-     *            returnDetail: { returnId, rma, returnStatus, returnCreationDate,
-     *                            returnPickupDelayed, returnInitiated, faqLink } }] }
-     */
-    function handleOrderEntryDetail(payload) {
-      if (payload.chat_message && payload.chat_message.trim() !== "") {
-        renderBotMessage(payload.chat_message)
-        renderBackToMenu()
-        enableInput("Type your message...")
-        return
-      }
-
-      const orderNo    = payload.orderNo    || "N/A"
-      const name       = payload.productName || null
-      const code       = payload.productCode || "—"
-      const imgUrl     = payload.productImageUrl || null
-      const relUrl     = payload.productUrl  || null
-      const productUrl = relUrl ? `${window.location.origin}${relUrl}` : null
-
-      const imgHtml = imgUrl
-        ? `<img src="${imgUrl}" alt="Product"
-               style="width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid #eee;"
-               onerror="this.style.display='none'">`
-        : ""
-
-      const nameHtml = name
-        ? `<div style="font-weight:700;font-size:0.88em;color:#222;line-height:1.35;">${name}</div>`
-        : ""
-
-      const codeHtml = productUrl
-        ? `<a href="${productUrl}" target="_blank"
-              style="font-size:0.76em;color:#c8972b;text-decoration:none;">${code}</a>`
-        : `<span style="font-size:0.76em;color:#888;">${code}</span>`
-
-      const returnBadge = payload.returnable
-        ? `<span style="color:#43a047;font-size:0.76em;">✅ Returnable</span>`
-        : `<span style="color:#9e9e9e;font-size:0.76em;">❌ Not Returnable</span>`
-      const exchBadge = payload.exchangeable
-        ? `<span style="color:#43a047;font-size:0.76em;">✅ Exchangeable</span>`
-        : `<span style="color:#9e9e9e;font-size:0.76em;">❌ Not Exchangeable</span>`
-
-      const items = Array.isArray(payload.item_details) ? payload.item_details : []
-
-      const itemsHtml = items.map(item => {
-        const c = item.consignment || {}
-        const r = item.returnDetail || {}
-
-        const status   = c.consignmentStatus || item.status || ""
-        const shipped  = c.shippedDate         ? `<div class="order-card-meta"><strong>Shipped:</strong> ${new Date(c.shippedDate).toLocaleDateString("en-IN")}</div>` : ""
-        const eta      = c.actualDeliveryDate  ? `<div class="order-card-meta"><strong>ETA:</strong> ${new Date(c.actualDeliveryDate).toLocaleDateString("en-IN")}</div>` : ""
-        const tracking = c.consignmentCode     ? `<div class="order-card-meta"><strong>Tracking #:</strong> ${c.consignmentCode}</div>` : ""
-        const tatAlert = c.deliveryTatBreached ? `<div class="order-card-meta" style="color:#e53935;font-size:0.8em;">⚠️ Delivery SLA breached — please contact support.</div>` : ""
-        const dispAlert = c.dispatchDelayed    ? `<div class="order-card-meta" style="color:#f57c00;font-size:0.8em;">⚠️ Dispatch is running late. Please allow extra time.</div>` : ""
-
-        let returnHtml = ""
-        if (r.returnInitiated) {
-          const rDate   = r.returnCreationDate ? new Date(r.returnCreationDate).toLocaleDateString("en-IN") : "N/A"
-          const rAlert  = r.returnPickupDelayed ? `<div class="order-card-meta" style="color:#f57c00;font-size:0.8em;">⚠️ Return pickup delayed — allow ~2 extra days.</div>` : ""
-          returnHtml = `
-            <div style="margin-top:6px;padding-top:6px;border-top:1px dashed #e0e0e0;">
-              <div class="order-card-meta" style="font-weight:600;color:#555;">↩️ Return Info</div>
-              ${r.returnStatus ? `<div class="order-card-meta"><strong>Return Status:</strong> ${r.returnStatus}</div>` : ""}
-              ${r.returnId     ? `<div class="order-card-meta"><strong>Return ID:</strong> ${r.returnId}</div>` : ""}
-              ${r.rma          ? `<div class="order-card-meta"><strong>RMA:</strong> ${r.rma}</div>` : ""}
-              <div class="order-card-meta"><strong>Raised On:</strong> ${rDate}</div>
-              ${rAlert}
-              ${r.faqLink ? `<div class="order-card-meta"><a href="${r.faqLink}" target="_blank" style="color:${theme.primary};font-weight:600;font-size:0.82em;">📖 Return FAQ</a></div>` : ""}
-            </div>`
-        }
-
-        return `
-          <div style="padding:8px 0;border-top:1px solid #f0f0f0;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <div style="font-size:0.8em;color:#555;">Qty: ${item.quantity || 1}</div>
-              ${status ? `<span class="order-status-badge">${status}</span>` : ""}
-            </div>
-            ${tracking}${shipped}${eta}${tatAlert}${dispAlert}${returnHtml}
-          </div>`
-      }).join("")
-
-      chatBody.innerHTML += `
-        <div class="order-card">
-          <div class="order-card-content">
-            <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;">
-              ${imgHtml}
-              <div style="flex:1;min-width:0;">
-                ${nameHtml}
-                ${codeHtml}
-                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
-                  ${returnBadge}
-                  ${exchBadge}
-                </div>
-              </div>
-            </div>
-            <div class="order-card-meta" style="font-size:0.78em;color:#888;">Order #${orderNo}</div>
-            ${itemsHtml}
-          </div>
-        </div>`
-
       chatBody.scrollTop = chatBody.scrollHeight
       renderBackToMenu()
       enableInput("Type your message...")

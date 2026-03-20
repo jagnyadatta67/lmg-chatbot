@@ -7,6 +7,13 @@
       "runtimeArgs": ["-f", "/Users/jagnyapanigrahi/Documents/LMG_CHATBOT/loipl/pom.xml", "spring-boot:run"],
       "port": 8080,
       "autoPort": false
+    },
+    {
+      "name": "widget-static",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "8181", "/Users/jagnyapanigrahi/Documents/LMG_CHATBOT/loipl/src/main/resources/static"],
+      "port": 8181,
+      "autoPort": false
     }
   ]
 }

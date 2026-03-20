@@ -735,6 +735,17 @@
         border-top: 1px solid #f3f4f6;
         font-size: 12px; color: #555;
       }
+      .entry-quick-actions {
+        display: flex; flex-wrap: wrap; gap: 6px;
+        margin-top: 10px; padding-top: 10px;
+        border-top: 1px solid #e8e8e8;
+      }
+      .entry-quick-btn {
+        background: white; border: 1.5px solid #607d8b; color: #607d8b;
+        font-size: 11px; padding: 5px 10px; border-radius: 8px;
+        cursor: pointer; font-weight: 600; transition: all .18s;
+      }
+      .entry-quick-btn:hover { background: #607d8b18; }
       .entry-faq-link {
         color: ${theme.primary}; font-weight: 600; text-decoration: none;
         font-size: 12px;
@@ -1152,7 +1163,7 @@
         try {
           const res = await fetch(`${backendBase}/api/support/ticket`, {
             method:  "POST",
-            headers: { "Content-Type": "application/json", "X-API-Key": config.apikey },
+            headers: { "Content-Type": "application/json"},
             body: JSON.stringify({
               ...ticketData,
               concept: config.concept,
@@ -1362,6 +1373,9 @@
         "Cancellation", "Refund", "Exchange", "Damaged Item", "Other"
       ]
 
+      const prefillCategory = payload?.prefillCategory || ""
+      const prefillMessage  = payload?.prefillMessage  || ""
+
       // Auto-fill from profile if logged in
       const profileName  = session.profile?.name  || session.profile?.firstName || ""
       const profileEmail = session.profile?.email || ""
@@ -1377,14 +1391,14 @@
           <label class="write-us-label">Category *</label>
           <select class="write-us-select" id="wu-category">
             <option value="">— Select category —</option>
-            ${CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join("")}
+            ${CATEGORIES.map(c => `<option value="${c}"${c === prefillCategory ? " selected" : ""}>${c}</option>`).join("")}
           </select>
         </div>
 
         <div class="write-us-field">
           <label class="write-us-label">Describe your issue *</label>
           <textarea class="write-us-textarea" id="wu-message"
-            placeholder="Please describe your issue in detail..."></textarea>
+            placeholder="Please describe your issue in detail...">${prefillMessage}</textarea>
         </div>
 
         <div class="write-us-field">
@@ -1439,6 +1453,7 @@
           renderBotMessage(`✅ <b>Ticket raised!</b><br>Reference: <b>${data.ticketId}</b><br>We'll get back to you within 24 hours.`)
         }
         renderBackToMenu()
+        enableInput("Type your message...")
       })
     }
 
@@ -1570,6 +1585,19 @@
         btn.disabled    = false
         btn.textContent = "View Order"
       }
+    })
+
+    /**
+     * Event delegation — quick-action "Write to Us" prefill buttons on entry cards.
+     */
+    chatBody.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-action='write-us-prefill']")
+      if (!btn) return
+      e.stopPropagation()
+      handleWriteUs({
+        prefillCategory: btn.dataset.category || "",
+        prefillMessage:  btn.dataset.message  || "",
+      })
     })
 
     /**
@@ -1772,6 +1800,17 @@
                 </div>
               </div>
               ${eligibility}
+              <div class="entry-quick-actions">
+                <button class="entry-quick-btn" data-action="write-us-prefill"
+                  data-category="Late Delivery"
+                  data-message="Order #${payload.orderNo}, Consignment #${cons.consignmentCode} — Order has not been delivered yet.">Order Not Delivered Yet</button>
+                <button class="entry-quick-btn" data-action="write-us-prefill"
+                  data-category="Delivery Issue"
+                  data-message="Order #${payload.orderNo}, Consignment #${cons.consignmentCode} — Item is missing from my order.">Missing Item</button>
+                <button class="entry-quick-btn" data-action="write-us-prefill"
+                  data-category=""
+                  data-message="Order #${payload.orderNo} — ">Need Other Help</button>
+              </div>
             </div>`
           chatBody.scrollTop = chatBody.scrollHeight
           return
@@ -1815,6 +1854,17 @@
               ${faqHtml}
             </div>
             ${eligibility}
+            <div class="entry-quick-actions">
+              <button class="entry-quick-btn" data-action="write-us-prefill"
+                data-category="Return"
+                data-message="Order #${payload.orderNo}, RMA #${ret.rma || ret.returnId} — Return item has not been picked up yet.">Item Not Picked Yet</button>
+              <button class="entry-quick-btn" data-action="write-us-prefill"
+                data-category="Refund"
+                data-message="Order #${payload.orderNo}, RMA #${ret.rma || ret.returnId} — Refund has not been processed.">Refund Issue</button>
+              <button class="entry-quick-btn" data-action="write-us-prefill"
+                data-category=""
+                data-message="Order #${payload.orderNo} — ">Need Other Help</button>
+            </div>
           </div>`
 
         chatBody.scrollTop = chatBody.scrollHeight
