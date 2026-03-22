@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LOIPL AI Chatbot — PPT Preview</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f0eb; padding: 40px 20px; }
+
+    .deck { display: flex; flex-direction: column; gap: 32px; max-width: 900px; margin: 0 auto; }
+
+    .slide {
+      background: #fff;
+      border: 1px solid #D1AC88;
+      border-radius: 4px;
+      padding: 48px 56px;
+      min-height: 320px;
+      position: relative;
+      box-shadow: 0 2px 12px #D1AC8822;
+    }
+
+    .slide-number {
+      position: absolute; top: 16px; right: 20px;
+      font-size: 11px; color: #D1AC88; font-weight: 700; letter-spacing: 1px;
+    }
+
+    .gold-bar {
+      width: 48px; height: 3px; background: #D1AC88; margin-bottom: 18px;
+    }
+
+    h1.slide-title {
+      font-size: 32px; font-weight: 800; color: #000; line-height: 1.2;
+      margin-bottom: 8px;
+    }
+    h2.slide-heading {
+      font-size: 22px; font-weight: 700; color: #000; margin-bottom: 20px;
+    }
+    .subtitle { font-size: 14px; color: #555; margin-top: 6px; letter-spacing: 0.5px; }
+
+    /* Agenda */
+    .agenda-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .agenda-list li {
+      display: flex; align-items: center; gap: 12px;
+      font-size: 15px; color: #000; font-weight: 500;
+    }
+    .agenda-num {
+      width: 28px; height: 28px; border: 1px solid #D1AC88;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: #D1AC88; flex-shrink: 0;
+    }
+
+    /* Bullets */
+    .bullet-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .bullet-list li { display: flex; gap: 10px; font-size: 14px; color: #222; line-height: 1.5; }
+    .bullet-list li::before { content: "▸"; color: #D1AC88; flex-shrink: 0; font-size: 13px; margin-top: 1px; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 4px; }
+    th {
+      background: #000; color: #D1AC88;
+      padding: 9px 14px; text-align: left; font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+    }
+    td { padding: 8px 14px; border-bottom: 1px solid #ece6de; color: #222; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fdf8f3; }
+
+    /* Two columns */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 8px; }
+    .col-card {
+      border: 1px solid #D1AC88; border-radius: 4px; padding: 20px;
+    }
+    .col-card h3 { font-size: 14px; font-weight: 700; color: #000; margin-bottom: 12px; border-bottom: 1px solid #D1AC88; padding-bottom: 8px; }
+
+    /* Flow diagram */
+    .flow { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
+    .flow-row { display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
+    .flow-box {
+      border: 1px solid #D1AC88; border-radius: 4px;
+      padding: 7px 14px; font-size: 12px; font-weight: 600; color: #000;
+      background: #fff; white-space: nowrap;
+    }
+    .flow-box.dark { background: #000; color: #D1AC88; }
+    .flow-arrow { color: #D1AC88; font-size: 18px; padding: 0 6px; }
+    .flow-branch { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 8px 32px; }
+    .flow-intent { border: 1px solid #D1AC88; border-radius: 4px; padding: 5px 10px; font-size: 11px; color: #555; }
+    .flow-connector { width: 2px; height: 14px; background: #D1AC88; margin-left: 20px; }
+
+    /* Placeholder */
+    .placeholder {
+      border: 1.5px dashed #D1AC88; border-radius: 4px;
+      height: 200px; display: flex; align-items: center; justify-content: center;
+      color: #D1AC88; font-size: 13px; font-weight: 600; letter-spacing: 0.5px;
+      margin-top: 8px;
+    }
+
+    /* Pricing highlight */
+    .price-highlight {
+      border: 1px solid #D1AC88; border-radius: 4px;
+      padding: 14px 20px; margin-top: 16px;
+      font-size: 13px; color: #000; background: #fdf8f3;
+    }
+    .price-highlight strong { color: #D1AC88; font-size: 15px; }
+
+    /* Check badge */
+    .check { color: #43a047; font-weight: 700; }
+    .cross { color: #e53935; font-weight: 700; }
+    .warn  { color: #f59e0b; font-weight: 700; }
+  </style>
+</head>
+<body>
+<div class="deck">
+
+  <!-- SLIDE 1: TITLE -->
+  <div class="slide">
+    <div class="slide-number">01 / 10</div>
+    <div style="height:60px"></div>
+    <div class="gold-bar"></div>
+    <h1 class="slide-title">LOIPL AI Chatbot</h1>
+    <h1 class="slide-title" style="color:#D1AC88;">Architecture Overview</h1>
+    <p class="subtitle">Landmark Group &nbsp;·&nbsp; Private Cloud &nbsp;·&nbsp; 2026</p>
+  </div>
+
+  <!-- SLIDE 2: AGENDA -->
+  <div class="slide">
+    <div class="slide-number">02 / 10</div>
+    <div class="gold-bar"></div>
+    <h2 class="slide-heading">Agenda</h2>
+    <ul class="agenda-list">
+      <li><span class="agenda-num">1</span> Self-Hosting Advantage</li>
+      <li><span class="agenda-num">2</span> Tech Stack</li>
+      <li><span class="agenda-num">3</span> Architecture Diagram</li>
+      <li><span class="agenda-num">4</span> Flow Diagram</li>
+      <li><span class="agenda-num">5</span> What We Are Offering</li>
+      <li><span class="agenda-num">6</span> Why Not No-Code / Third-Party Chatbots</li>
+      <li><span class="agenda-num">7</span> Developer Experience &amp; Comparison</li>
+      <li><span class="agenda-num">8</span> Cost &amp; Pricing</li>
+    </ul>
+  </div>
+
+  <!-- SLIDE 3: SELF-HOSTING -->
+  <div class="slide">
+    <div class="slide-number">03 / 10</div>
+    <div class="gold-bar"></div>
+    <h2 class="slide-heading">Self-Hosting Advantage</h2>
+    <ul class="bullet-list">
+      <li>Fully hosted on <strong>Landmark's private cloud</strong> infrastructure</li>
+      <li><strong>Zero customer data shared</strong> with any third-party vendor</li>
+      <li>Full data sovereignty — conversation history, order data &amp; profiles never leave LMG servers</li>
+      <li>No vendor lock-in — we own the code, the model calls, and the data</li>
+      <li>Compliant with internal data governance and security policies</li>
+      <li>Full control over uptime, scaling, and access permissions</li>
+    </ul>
+  </div>
+
+  <!-- SLIDE 4: TECH STACK -->
+  <div class="slide">
+    <div class="slide-number">04 / 10</div>
+    <div class="gold-bar"></div>
+    <h2 class="slide-heading">Tech Stack</h2>
+    <table>
+      <thead><tr><th>Layer</th><th>Technology</th></tr></thead>
+      <tbody>
+        <tr><td>Backend</td><td>Spring Boot 3.5.6 · Java 21</td></tr>
+        <tr><td>AI Orchestration</td><td>Spring AI 1.0.3</td></tr>
+        <tr><td>Language Model</td><td>OpenAI GPT-4o-mini (intent classification + responses)</td></tr>
+        <tr><td>Relational DB</td><td>MySQL — clients, analytics, ingest jobs</td></tr>
+        <tr><td>Vector DB</td><td>Redis — semantic RAG search + response caching</td></tr>
+        <tr><td>Cache</td><td>Caffeine — 1hr TTL, chatbot + intent cache</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SLIDE 5: ARCHITECTURE DIAGRAM -->
+  <div class="slide">
+    <div class="slide-number">05 / 10</div>
+    <div class="gold-bar"></div>
+    <h2 class="slide-heading">Architecture Diagram</h2>
+    <div class="placeholder">[ Insert Architecture Diagram Here ]</div>
+  </div>
+
+  <!-- SLIDE 6: FLOW DIAGRAM -->
+  <div class="slide">
+    <div class="slide-number">06 / 10</div>
+    <div class="gold-bar"></div>
+    <h2 class="slide-heading">Flow Diagram</h2>
+    <div class="flow">
+      <div class="flow-row">
+        <div class="flow-box">User Message</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">Pattern Matcher (fast-path)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box dark">Intent Classifier · GPT-4o-mini</div>
+      </div>
+      <div class="flow-connector"></div>
+      <div class="flow-branch">
+        <div class="flow-intent">ORDER_TRACKING → Hybris Order API</div>
+        <div class="flow-intent">ORDER_LISTING → Hybris Orders API</div>
+        <div class="flow-intent">STORE_LOCATOR → Store API</div>
+        <div class="flow-intent">GIFT_CARD_BALANCE → Gift Card API</div>
+        <div class="flow-intent">CUSTOMER_PROFILE → Profile API</div>
+        <div class="flow-intent">POLICY_QUESTION → Redis Vector DB (RAG)</div>
+        <div class="flow-intent">GENERAL_QUERY → GPT-4o-mini</div>
+      </div>
+      <div class="flow-connector"></div>
+      <div class="flow-row">
+        <div class="flow-box dark">ChatbotResponse&lt;T&gt;</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">Widget Renderer</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">User</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 7: WHAT WE OFFER -->
+  <div class="slide">
+    <div class="slide-number">07 / 10</div>
+    <div class="gold-bar"></div>
+    <h2 class="slide-heading">What We Are Offering</h2>
+    <div class="two-col">
+      <div class="col-card">
+        <h3>Flow-Based (Menu &amp; Submenu)</h3>
+        <ul class="bullet-list">
+          <li>Structured navigation with clickable categories</li>
+          <li>Main Menu → Submenu → Action</li>
+          <li>No typing required</li>
+          <li>Track Order · Store Locator · Gift Card · Write to Us · My Profile</li>
+          <li>Ideal for guided navigation</li>
+        </ul>
+      </div>
+      <div class="col-card">
+        <h3>Free Text (Natural Language)</h3>
+        <ul class="bullet-list">
+          <li>User types anything in their own words</li>
+          <li>AI automatically classifies the intent</li>
+          <li>Routes to the correct handler + API</li>
+          <li>Handles typos, variations, mixed queries</li>
+          <li>No rigid structure required</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 8: WHY NOT NO-CODE -->
+  <div class="slide">
+    <div class="slide-number">08 / 10</div>
+    <div class="gold-bar"></div>
+    <h2 class="slide-heading">Why Not No-Code / Third-Party Chatbots</h2>
+    <table>
+      <thead><tr><th>Aspect</th><th>LOIPL (Ours)</th><th>No-Code / SaaS</th></tr></thead>
+      <tbody>
+        <tr><td>Data Privacy</td><td><span class="check">✅</span> Private cloud, zero sharing</td><td><span class="cross">❌</span> Data sent to vendor</td></tr>
+        <tr><td>Brand Customisation</td><td><span class="check">✅</span> Full control, multi-brand</td><td><span class="warn">⚠️</span> Limited to platform templates</td></tr>
+        <tr><td>API Integration</td><td><span class="check">✅</span> Direct Hybris/OMS, no middleware</td><td><span class="cross">❌</span> Requires connectors / webhooks</td></tr>
+        <tr><td>Cost</td><td><span class="check">✅</span> Only OpenAI token cost</td><td><span class="cross">❌</span> Monthly SaaS licensing fees</td></tr>
+        <tr><td>Vendor Lock-in</td><td><span class="check">✅</span> None — we own the code</td><td><span class="cross">❌</span> Locked to vendor platform</td></tr>
+        <tr><td>Custom Intent Logic</td><td><span class="check">✅</span> Any business rule possible</td><td><span class="cross">❌</span> Constrained by platform</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SLIDE 9: DEVELOPER EXPERIENCE -->
+  <div class="slide">
+    <div class="slide-number">09 / 10</div>
+    <div class="gold-bar"></div>
+    <h2 class="slide-heading">Developer Experience &amp; Comparison</h2>
+    <p style="font-size:13px;color:#555;margin-bottom:14px;">Adding a new feature in LOIPL — <strong>5 steps · ~1–2 hours</strong></p>
+    <ul class="bullet-list" style="margin-bottom:20px;">
+      <li>Create DTO (response shape)</li>
+      <li>Create Tool — API caller with <code style="background:#f4f0eb;padding:1px 5px;border-radius:3px;">@Tool</code></li>
+      <li>Create Intent Handler — <code style="background:#f4f0eb;padding:1px 5px;border-radius:3px;">@Component</code> implements <code style="background:#f4f0eb;padding:1px 5px;border-radius:3px;">IntentHandler</code></li>
+      <li>Add one bullet to Intent Classifier prompt</li>
+      <li>Spring auto-discovers — <strong>zero manual wiring</strong></li>
+    </ul>
+    <table>
+      <thead><tr><th>Framework</th><th>Effort to Add New Intent</th></tr></thead>
+      <tbody>
+        <tr><td><strong>LOIPL</strong></td><td>~1–2 hrs · Java · no retraining</td></tr>
+        <tr><td>Dialogflow</td><td>NLU training + webhook config + entity setup</td></tr>
+        <tr><td>Rasa</td><td>Training data + ML retraining + pipeline rebuild</td></tr>
+        <tr><td>LangChain</td><td>Python chains + custom memory + tool wiring</td></tr>
+        <tr><td>Generic SaaS Bot</td><td>Platform UI config + no direct API access</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SLIDE 10: PRICING -->
+  <div class="slide">
+    <div class="slide-number">10 / 10</div>
+    <div class="gold-bar"></div>
+    <h2 class="slide-heading">Cost &amp; Pricing — OpenAI GPT-4o-mini</h2>
+    <div class="two-col">
+      <div>
+        <table>
+          <thead><tr><th>Token Type</th><th>Cost</th></tr></thead>
+          <tbody>
+            <tr><td>Input tokens</td><td>$0.15 / 1M tokens</td></tr>
+            <tr><td>Output tokens</td><td>$0.60 / 1M tokens</td></tr>
+          </tbody>
+        </table>
+        <table style="margin-top:14px;">
+          <thead><tr><th>Scenario</th><th>Cost / Conversation</th></tr></thead>
+          <tbody>
+            <tr><td>Intent classification only</td><td>~$0.00008</td></tr>
+            <tr><td>Full response (order/profile)</td><td>~$0.0003</td></tr>
+            <tr><td>RAG policy answer</td><td>~$0.0006</td></tr>
+            <tr><td><strong>Average interaction</strong></td><td><strong>~$0.0003</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <table>
+          <thead><tr><th>Monthly Conversations</th><th>Approx. Cost</th></tr></thead>
+          <tbody>
+            <tr><td>10,000</td><td>~$3</td></tr>
+            <tr><td>100,000</td><td>~$30</td></tr>
+            <tr><td>1,000,000</td><td>~$300</td></tr>
+          </tbody>
+        </table>
+        <div class="price-highlight">
+          <strong>No platform fees.</strong><br/>
+          No per-seat charges.<br/>
+          Pay only for tokens used.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

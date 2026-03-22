@@ -1,4 +1,12 @@
 ;(() => {
+  // ── SPA singleton guard ───────────────────────────────────────────────────
+  // Prevents duplicate widget instances on SPA route changes (React / Vue /
+  // Angular). Uses DOM presence — NOT a window flag — so that if the SPA
+  // framework clears the body the widget can safely re-mount on next navigation,
+  // while still blocking double-mount within the same render cycle.
+  if (document.getElementById('chatbot-container')) return
+  // ─────────────────────────────────────────────────────────────────────────
+
   const scriptTag =
     document.currentScript || Array.from(document.querySelectorAll('script[src*="chatbot-widget.js"]')).pop()
 
@@ -15,6 +23,16 @@
     const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'))
     return match ? match[1] : null
   }
+
+  // ── URL helper ────────────────────────────────────────────────────────────
+  // Ensures all product URLs from the API get the /in/en locale prefix.
+  // Safe to call multiple times — never double-prefixes.
+  function toProductPath(url) {
+    if (!url) return url
+    if (url.startsWith('http') || url.startsWith('/in/en')) return url
+    return '/in/en' + (url.startsWith('/') ? url : '/' + url)
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   // --- Config ---
   // Priority for userid/token:
@@ -741,11 +759,11 @@
         border-top: 1px solid #e8e8e8;
       }
       .entry-quick-btn {
-        background: white; border: 1.5px solid #607d8b; color: #607d8b;
+        background: transparent; border: 1px solid #D1AC88; color: #000;
         font-size: 11px; padding: 5px 10px; border-radius: 8px;
         cursor: pointer; font-weight: 600; transition: all .18s;
       }
-      .entry-quick-btn:hover { background: #607d8b18; }
+      .entry-quick-btn:hover { background: #D1AC8820; }
       .entry-faq-link {
         color: ${theme.primary}; font-weight: 600; text-decoration: none;
         font-size: 12px;
@@ -814,39 +832,62 @@
       .write-us-form {
         background: white;
         border: 1px solid #e5e7eb;
-        border-top: 3px solid ${theme.primary};
         border-radius: 14px;
-        padding: 16px;
+        padding: 20px 18px 18px;
         margin: 8px 0;
-        display: flex; flex-direction: column; gap: 10px;
-        box-shadow: 0 3px 12px rgba(0,0,0,0.06);
+        display: flex; flex-direction: column; gap: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
       }
-      .write-us-form h4 { margin: 0 0 2px; font-size: 14px; color: ${theme.primary}; font-weight: 700; }
-      .write-us-form p  { margin: 0 0 4px; font-size: 12px; color: #888; }
-      .write-us-field { display: flex; flex-direction: column; gap: 4px; }
-      .write-us-label { font-size: 12px; font-weight: 700; color: #555; }
+      .write-us-form h2 {
+        margin: 0 0 2px; font-size: 22px; font-weight: 700;
+        color: #333; letter-spacing: -0.3px;
+      }
+      .write-us-form .wu-subtitle {
+        margin: 0; font-size: 12px; color: #777;
+      }
+      .write-us-divider {
+        border: none; border-top: 1px solid #e5e7eb; margin: 0;
+      }
+      .write-us-feedback-label {
+        font-size: 12px; font-weight: 700; color: #333; margin-bottom: 6px;
+      }
+      .write-us-radio-group {
+        display: flex; gap: 20px; align-items: center;
+      }
+      .write-us-radio-label {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 13px; color: #444; cursor: pointer;
+      }
+      .write-us-radio-label input[type=radio] { accent-color: ${theme.primary}; cursor: pointer; }
+      .write-us-row {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      }
+      .write-us-field { display: flex; flex-direction: column; gap: 5px; }
+      .write-us-label { font-size: 12px; font-weight: 600; color: #444; }
       .write-us-input, .write-us-select, .write-us-textarea {
-        width: 100%;
+        width: 100%; box-sizing: border-box;
         padding: 10px 12px;
-        border: 1.5px solid #e5e7eb;
-        border-radius: 10px;
+        border: 1.5px solid #d1d5db;
+        border-radius: 8px;
         font-size: 13px; font-family: inherit;
-        outline: none;
-        transition: border-color 0.2s;
-        min-height: 44px;
+        outline: none; color: #333;
+        background: #f9fafb;
+        transition: border-color 0.2s, background 0.2s;
+        min-height: 42px;
       }
       .write-us-input:focus, .write-us-select:focus, .write-us-textarea:focus {
         border-color: ${theme.primary};
-        box-shadow: 0 0 0 3px rgba(${hexToRgb(theme.primary)}, 0.1);
+        background: white;
+        box-shadow: 0 0 0 3px rgba(${hexToRgb(theme.primary)}, 0.12);
       }
-      .write-us-textarea { resize: vertical; min-height: 80px; }
+      .write-us-textarea { resize: vertical; min-height: 100px; }
       .write-us-submit {
-        background: linear-gradient(135deg, ${theme.primary}, ${theme.secondary});
-        color: white; border: none; border-radius: 10px;
-        padding: 12px; font-size: 14px; font-weight: 700;
+        background: ${theme.primary};
+        color: white; border: none; border-radius: 8px;
+        padding: 13px 28px; font-size: 14px; font-weight: 700;
         cursor: pointer; font-family: inherit;
-        transition: opacity 0.2s;
-        min-height: 48px;
+        transition: opacity 0.2s; align-self: flex-start;
+        min-width: 140px;
       }
       .write-us-submit:hover    { opacity: 0.88; }
       .write-us-submit:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -1369,8 +1410,24 @@
       renderBotMessage(introMsg)
 
       const CATEGORIES = [
-        "Query", "Return", "Delivery Issue", "Late Delivery",
-        "Cancellation", "Refund", "Exchange", "Damaged Item", "Other"
+        "I want to cancel my order",
+        "Delivery status",
+        "Incomplete/Missing product",
+        "Related to Delivery executive",
+        "My product was Damaged/defective",
+        "Delay in return Pick up",
+        "I have received Wrong Product/Wrong size",
+        "I want to return my product",
+        "My Return was picked up but I haven't received my refund",
+        "I want to cancel my return",
+        "Return policy",
+        "My Bank account details for refund",
+        "Where is my refund",
+        "My order is cancelled but I haven't received my refund",
+        "I am unable to place order/Unable to Login to my account",
+        "I am unable to redeem Gift card/Voucher",
+        "My order didnt get placed but payment got debited",
+        "Others"
       ]
 
       const prefillCategory = payload?.prefillCategory || ""
@@ -1384,56 +1441,86 @@
       const form = document.createElement("div")
       form.className = "write-us-form"
       form.innerHTML = `
-        <h4>✉️ Write to Us</h4>
-        <p>We'll respond within 24 hours</p>
+        <h2>Write to us</h2>
+        <p class="wu-subtitle">We'd love to hear suggestions and comments.</p>
+
+        <hr class="write-us-divider">
+
+        <div>
+          <div class="write-us-feedback-label">Your feedback is about our:</div>
+          <div class="write-us-radio-group">
+            <label class="write-us-radio-label">
+              <input type="radio" name="wu-experience" value="Online experience" checked> Online experience
+            </label>
+            <label class="write-us-radio-label">
+              <input type="radio" name="wu-experience" value="In-store experience"> In-store experience
+            </label>
+          </div>
+        </div>
+
+        <div class="write-us-row">
+          <div class="write-us-field">
+            <label class="write-us-label">Your name</label>
+            <input class="write-us-input" id="wu-name" type="text"
+              placeholder="Your name" value="${profileName}">
+          </div>
+          <div class="write-us-field">
+            <label class="write-us-label">Your email</label>
+            <input class="write-us-input" id="wu-email" type="email"
+              placeholder="your@email.com" value="${profileEmail}">
+          </div>
+        </div>
+
+        <div class="write-us-row">
+          <div class="write-us-field">
+            <label class="write-us-label">Mobile Number</label>
+            <input class="write-us-input" id="wu-phone" type="tel"
+              placeholder="Mobile number" value="${profilePhone}">
+          </div>
+          <div class="write-us-field">
+            <label class="write-us-label">City</label>
+            <input class="write-us-input" id="wu-city" type="text" placeholder="Your city">
+          </div>
+        </div>
 
         <div class="write-us-field">
-          <label class="write-us-label">Category *</label>
+          <label class="write-us-label">Landmark Rewards number <span style="font-weight:400;color:#999;">(optional)</span></label>
+          <input class="write-us-input" id="wu-rewards" type="text"
+            placeholder="Your Landmark Rewards number">
+        </div>
+
+        <div class="write-us-field">
+          <label class="write-us-label">Your query relates to</label>
           <select class="write-us-select" id="wu-category">
-            <option value="">— Select category —</option>
+            <option value="">Select your reason of query</option>
             ${CATEGORIES.map(c => `<option value="${c}"${c === prefillCategory ? " selected" : ""}>${c}</option>`).join("")}
           </select>
         </div>
 
         <div class="write-us-field">
-          <label class="write-us-label">Describe your issue *</label>
+          <label class="write-us-label">Tell us what you think</label>
           <textarea class="write-us-textarea" id="wu-message"
-            placeholder="Please describe your issue in detail...">${prefillMessage}</textarea>
+            placeholder="Enter your comments here">${prefillMessage}</textarea>
         </div>
 
-        <div class="write-us-field">
-          <label class="write-us-label">Name *</label>
-          <input class="write-us-input" id="wu-name" type="text"
-            placeholder="Your name" value="${profileName}">
-        </div>
-
-        <div class="write-us-field">
-          <label class="write-us-label">Email *</label>
-          <input class="write-us-input" id="wu-email" type="email"
-            placeholder="your@email.com" value="${profileEmail}">
-        </div>
-
-        <div class="write-us-field">
-          <label class="write-us-label">Phone</label>
-          <input class="write-us-input" id="wu-phone" type="tel"
-            placeholder="Mobile number (optional)" value="${profilePhone}">
-        </div>
-
-        <button class="write-us-submit" id="wu-submit">Submit Ticket</button>
+        <button class="write-us-submit" id="wu-submit">Submit</button>
       `
       chatBody.appendChild(form)
       chatBody.scrollTop = chatBody.scrollHeight
 
       // Submit handler
       form.querySelector("#wu-submit").addEventListener("click", async () => {
-        const category = form.querySelector("#wu-category").value.trim()
-        const message  = form.querySelector("#wu-message").value.trim()
-        const name     = form.querySelector("#wu-name").value.trim()
-        const email    = form.querySelector("#wu-email").value.trim()
-        const phone    = form.querySelector("#wu-phone").value.trim()
+        const category    = form.querySelector("#wu-category").value.trim()
+        const name        = form.querySelector("#wu-name").value.trim()
+        const email       = form.querySelector("#wu-email").value.trim()
+        const phone       = form.querySelector("#wu-phone").value.trim()
+        const city        = form.querySelector("#wu-city").value.trim()
+        const rewards     = form.querySelector("#wu-rewards").value.trim()
+        const experience  = form.querySelector("input[name='wu-experience']:checked")?.value || "Online experience"
+        const message     = form.querySelector("#wu-message").value.trim()
+        const platformType = experience === "In-store experience" ? "In-store" : "Online"
 
-        if (!category) { renderBotMessage("⚠️ Please select a category."); return }
-        if (!message)  { renderBotMessage("⚠️ Please describe your issue."); return }
+        if (!category) { renderBotMessage("⚠️ Please select your reason of query."); return }
         if (!name)     { renderBotMessage("⚠️ Please enter your name."); return }
         if (!email)    { renderBotMessage("⚠️ Please enter your email."); return }
 
@@ -1442,15 +1529,22 @@
         btn.disabled = true
         btn.textContent = "Sending…"
 
-        const { data, error } = await api.submitTicket({ name, email, phone, category, message })
+        const { data, error } = await api.submitTicket({
+          name, email, phone, category, message,
+          city, rewards, platformType
+        })
 
         // Remove form from chat
         form.remove()
 
         if (error || !data?.success) {
-          renderBotMessage(data?.message || "😔 Unable to send right now. Please try again or call us.")
+          renderBotMessage("😔 Something went wrong on our end. Don't worry — please try again in a moment or call us directly. We're always here to help!")
         } else {
-          renderBotMessage(`✅ <b>Ticket raised!</b><br>Reference: <b>${data.ticketId}</b><br>We'll get back to you within 24 hours.`)
+          renderBotMessage(
+            `🎉 <b>We've got your query!</b><br><br>` +
+            `Thank you for reaching out to us. Your concern has been received and our customer care team will get back to you shortly. ` +
+            `We truly value your patience and trust in us. 💛`
+          )
         }
         renderBackToMenu()
         enableInput("Type your message...")
@@ -1727,7 +1821,7 @@
       const productCode  = payload.productCode  ? `<div class="entry-product-code">Code: ${payload.productCode}</div>` : ""
       const orderCodeHtml = payload.orderNo ? `<div class="entry-order-code">Order #${payload.orderNo}</div>` : ""
       const productLink  = payload.productUrl
-        ? `<a href="${payload.productUrl}" target="_blank" style="text-decoration:none;">${productImg}</a>`
+        ? `<a href="${window.location.origin}${toProductPath(payload.productUrl)}" target="_blank" style="text-decoration:none;">${productImg}</a>`
         : productImg
 
       // ── One card per item_detail ──────────────────────────────────────────
@@ -1756,8 +1850,16 @@
             <span>${payload.exchangeable ? "✅ Exchangeable" : "❌ Not Exchangeable"}</span>
           </div>`
 
-        // ─── CASE 1: No consignment — order placed, not yet shipped ──────────
+        // ─── CASE 1: No consignment — order placed / cancelled ───────────────
         if (!hasCons && !hasRet) {
+          const isCancelled = (item.status || "").toUpperCase() === "CANCELLED"
+          const cancelBtn = isCancelled
+            ? `<div class="entry-quick-actions">
+                 <button class="entry-quick-btn" data-action="write-us-prefill"
+                   data-category="My order is cancelled but I haven't received my refund"
+                   data-message="Order #${payload.orderNo} — My order is cancelled but I have not received my refund.">My order is cancelled but I haven't received my refund</button>
+               </div>`
+            : ""
           chatBody.innerHTML += `
             <div class="entry-detail-card">
               ${header}
@@ -1766,6 +1868,7 @@
                 <div class="entry-detail-row"><span>Qty</span><b>${item.quantity || 1}</b></div>
               </div>
               ${eligibility}
+              ${cancelBtn}
             </div>`
           chatBody.scrollTop = chatBody.scrollHeight
           return
@@ -1780,6 +1883,33 @@
             ? `<div class="entry-tat-alert">⚠️ Delivery exceeded the promised timeframe — please contact support.</div>` : ""
           const dispAlert = cons.dispatchDelayed
             ? `<div class="entry-tat-alert">⏳ Dispatch is running later than expected. We'll update you soon.</div>` : ""
+
+          // Status-based quick-action buttons
+          const _cs = (cons.consignmentStatus || item.status || "").toUpperCase()
+          const _isDelivered  = _cs === "DELIVERED"
+          const _isInTransit  = _cs === "SHIPPED" || _cs === "OUT_FOR_DELIVERY"
+                             || _cs.includes("DISPATCH") || _cs.includes("TRANSIT")
+          let consQuickBtns = ""
+          if (_isDelivered) {
+            consQuickBtns = `
+              <button class="entry-quick-btn" data-action="write-us-prefill"
+                data-category="Incomplete/Missing product"
+                data-message="Order #${payload.orderNo}, Consignment #${cons.consignmentCode} — Incomplete or missing product received.">Incomplete/Missing product</button>
+              <button class="entry-quick-btn" data-action="write-us-prefill"
+                data-category="My product was Damaged/defective"
+                data-message="Order #${payload.orderNo}, Consignment #${cons.consignmentCode} — Product received was damaged or defective.">Damaged/Defective</button>
+              <button class="entry-quick-btn" data-action="write-us-prefill"
+                data-category="I want to return my product"
+                data-message="Order #${payload.orderNo}, Consignment #${cons.consignmentCode} — I want to return my product.">Return Product</button>`
+          } else if (_isInTransit) {
+            consQuickBtns = `
+              <button class="entry-quick-btn" data-action="write-us-prefill"
+                data-category="Related to Delivery executive"
+                data-message="Order #${payload.orderNo}, Consignment #${cons.consignmentCode} — Issue related to delivery executive.">Delivery Executive Issue</button>
+              <button class="entry-quick-btn" data-action="write-us-prefill"
+                data-category="Delivery status"
+                data-message="Order #${payload.orderNo}, Consignment #${cons.consignmentCode} — Enquiry about delivery status.">Delivery Status</button>`
+          }
 
           chatBody.innerHTML += `
             <div class="entry-detail-card">
@@ -1800,17 +1930,7 @@
                 </div>
               </div>
               ${eligibility}
-              <div class="entry-quick-actions">
-                <button class="entry-quick-btn" data-action="write-us-prefill"
-                  data-category="Late Delivery"
-                  data-message="Order #${payload.orderNo}, Consignment #${cons.consignmentCode} — Order has not been delivered yet.">Order Not Delivered Yet</button>
-                <button class="entry-quick-btn" data-action="write-us-prefill"
-                  data-category="Delivery Issue"
-                  data-message="Order #${payload.orderNo}, Consignment #${cons.consignmentCode} — Item is missing from my order.">Missing Item</button>
-                <button class="entry-quick-btn" data-action="write-us-prefill"
-                  data-category=""
-                  data-message="Order #${payload.orderNo} — ">Need Other Help</button>
-              </div>
+              ${consQuickBtns ? `<div class="entry-quick-actions">${consQuickBtns}</div>` : ""}
             </div>`
           chatBody.scrollTop = chatBody.scrollHeight
           return
@@ -1854,17 +1974,45 @@
               ${faqHtml}
             </div>
             ${eligibility}
-            <div class="entry-quick-actions">
-              <button class="entry-quick-btn" data-action="write-us-prefill"
-                data-category="Return"
-                data-message="Order #${payload.orderNo}, RMA #${ret.rma || ret.returnId} — Return item has not been picked up yet.">Item Not Picked Yet</button>
-              <button class="entry-quick-btn" data-action="write-us-prefill"
-                data-category="Refund"
-                data-message="Order #${payload.orderNo}, RMA #${ret.rma || ret.returnId} — Refund has not been processed.">Refund Issue</button>
-              <button class="entry-quick-btn" data-action="write-us-prefill"
-                data-category=""
-                data-message="Order #${payload.orderNo} — ">Need Other Help</button>
-            </div>
+            ${(() => {
+              const rs     = (ret.returnStatus || "").toUpperCase()
+              const ref    = ret.rma || ret.returnId || ""
+              const prefix = `Order #${payload.orderNo}${ref ? `, RMA #${ref}` : ""}`
+
+              const btn = (label, category, msg) =>
+                `<button class="entry-quick-btn" data-action="write-us-prefill"
+                   data-category="${category}"
+                   data-message="${prefix} — ${msg}">${label}</button>`
+
+              let btns = ""
+
+              if (["PICKUP_SCHEDULED", "PICKUP_RESCHEDULED"].includes(rs)) {
+                btns =
+                  btn("Delay in Return Pickup",       "Delay in return Pick up",                              "Return pickup is delayed.") +
+                  btn("Wrong Product/Size",            "I have received Wrong Product/Wrong size",             "Wrong product or wrong size received.") +
+                  btn("Related to Delivery executive", "Related to Delivery executive",                        "Issue related to delivery executive during return.")
+
+              } else if (["PICKUP_COMPLETE", "QC_FAILED", "SUBMITTED_TO_WAREHOUSER"].includes(rs)) {
+                btns =
+                  btn("No Refund After Pickup",        "My Return was picked up but I haven't received my refund", "Return was picked up but refund not received.") +
+                  btn("My Return was picked up but I haven't received my refund", "My Return was picked up but I haven't received my refund", "Return picked up but no refund yet.") +
+                  btn("Where Is My Refund",             "Where is my refund",                                  "Refund not received after return pickup.")
+
+              } else if (["REFUND_INITIATED", "EFUND_INITIATED", "REFUND_PROCESSED"].includes(rs)) {
+                btns =
+                  btn("Where Is My Refund",             "Where is my refund",                                  "Refund initiated but not received yet.") +
+                  btn("My Return was picked up but I haven't received my refund", "My Return was picked up but I haven't received my refund", "Return picked up, refund still pending.")
+
+              } else {
+                // Unknown / default
+                btns =
+                  btn("Delay in Return Pickup",         "Delay in return Pick up",                             "Return pickup issue.") +
+                  btn("Where Is My Refund",             "Where is my refund",                                  "Refund query.") +
+                  btn("Need Other Help",                "",                                                    "")
+              }
+
+              return `<div class="entry-quick-actions">${btns}</div>`
+            })()}
           </div>`
 
         chatBody.scrollTop = chatBody.scrollHeight
@@ -2455,7 +2603,7 @@
     function renderOrderEntryRow(entry, orderNo) {
       const img    = entry.resolvedProductImage || entry.productImage || null
       const relUrl = entry.resolvedProductUrl   || entry.productUrl   || null
-      const productUrl = relUrl ? `${window.location.origin}${relUrl}` : null
+      const productUrl = relUrl ? `${window.location.origin}${toProductPath(relUrl)}` : null
       const name   = entry.resolvedProductName  || entry.productName  || null
       const code   = entry.productCode || "—"
       const qty    = entry.quantity    || 1

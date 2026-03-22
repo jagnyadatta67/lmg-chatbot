@@ -136,11 +136,11 @@ public class IntentClassifier {
             String modelName = response.getMetadata().getModel();
             String finishReason = response.getResult().getMetadata().getFinishReason();
 
-            Usage usage = response.getMetadata().getUsage();
-            int promptTokens = usage != null ? usage.getPromptTokens().intValue() : 0;
-            int completionTokens = usage != null ? usage.getCompletionTokens().intValue() : 0;
+                Usage usage = response.getMetadata().getUsage();
+                int promptTokens = usage != null ? usage.getPromptTokens().intValue() : 0;
+                int completionTokens = usage != null ? usage.getCompletionTokens().intValue() : 0;
 
-            // ✅ Track analytics
+                // ✅ Track analytics
             aiAnalyticsService.trackUsage(
                     null,
                     null,

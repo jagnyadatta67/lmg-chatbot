@@ -28,15 +28,24 @@ public class SupportTicketRequest {
     @Size(max = 20)
     private String phone;
 
+    /** Customer's city */
+    @Size(max = 100)
+    private String city;
+
+    /** Landmark Rewards number (optional) */
+    @Size(max = 50)
+    private String rewards;
+
+    /** Experience type — "Online" or "In-store experience" */
+    private String platformType;
+
     /**
-     * Issue category — one of:
-     * Query | Return | Delivery | Late Delivery | Cancellation | Refund | Other
+     * Issue category / reason of query
      */
     @NotBlank(message = "Category is required")
     private String category;
 
     /** Customer's description of the issue */
-    @NotBlank(message = "Message is required")
     @Size(max = 2000)
     private String message;
 

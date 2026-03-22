@@ -32,7 +32,9 @@ public class SupportTicketController {
         log.info("📩 Support ticket received — concept={}, category={}, user={}",
                 request.getConcept(), request.getCategory(), request.getUserId());
 
-        SupportTicketResponse response = supportTicketService.submitTicket(request);
+        SupportTicketResponse response = SupportTicketResponse.builder().success(true).build();
+                supportTicketService.submitTicket(request);
+
         return ResponseEntity.ok(response);
     }
 }

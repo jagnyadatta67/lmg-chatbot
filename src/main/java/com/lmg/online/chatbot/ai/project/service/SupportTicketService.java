@@ -10,9 +10,14 @@ import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
 
 /**
  * Handles support ticket lifecycle:
@@ -30,6 +35,7 @@ public class SupportTicketService {
 
     private final JavaMailSender             mailSender;
     private final SupportTicketRepository    ticketRepository;
+    private final RestTemplate               restTemplate;
 
     @Value("${support.email.to:support@landmarkgroup.in}")
     private String supportEmailTo;
@@ -39,7 +45,8 @@ public class SupportTicketService {
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    public SupportTicketResponse submitTicket(SupportTicketRequest req) {
+    @Async
+    public void submitTicket(SupportTicketRequest req) {
         String ticketId = generateTicketId();
 
         // ── Step 1: Persist to DB ─────────────────────────────────────────────
@@ -66,7 +73,10 @@ public class SupportTicketService {
             log.error("⚠️  Failed to persist ticket {} to DB: {}", ticketId, dbEx.getMessage(), dbEx);
         }
 
-        // ── Step 2: Send notification email ──────────────────────────────────
+        // ── Step 2: Call Hybris feedback/submit API ───────────────────────────
+        submitToHybris(req, ticketId);
+
+        // ── Step 3: Send notification email ──────────────────────────────────
         try {
             sendEmail(req, ticketId);
 
@@ -75,11 +85,7 @@ public class SupportTicketService {
             ticketRepository.save(ticket);
 
             log.info("✉️  Support ticket {} raised — concept={}, category={}", ticketId, req.getConcept(), req.getCategory());
-            return SupportTicketResponse.builder()
-                    .success(true)
-                    .ticketId(ticketId)
-                    .message("✅ Your ticket **" + ticketId + "** has been raised! We'll get back to you within 24 hours.")
-                    .build();
+
 
         } catch (Exception emailEx) {
             log.error("❌ Failed to send support email — ticketId={}: {}", ticketId, emailEx.getMessage(), emailEx);
@@ -87,12 +93,7 @@ public class SupportTicketService {
             String phone = ConceptBaseUrlResolver.getRawPhoneNumber(
                     req.getConcept() != null ? req.getConcept() : "LIFESTYLE");
 
-            return SupportTicketResponse.builder()
-                    .success(false)
-                    .ticketId(ticketId)   // ticket IS in DB even if email failed
-                    .message("😔 Your ticket **" + ticketId + "** was saved but we couldn't send the confirmation email. " +
-                             "Please call " + phone + " for immediate help.")
-                    .build();
+
         }
     }
 
@@ -153,6 +154,53 @@ public class SupportTicketService {
                 safe(req.getEnv()),
                 safe(req.getMessage())
         );
+    }
+
+    /**
+     * Forwards the form submission to the Hybris storefront feedback API.
+     * POST {concept+env base}/in/en/feedback/submit  (application/x-www-form-urlencoded)
+     * Runs on the async executor — fire-and-forget, never blocks the API response.
+     */
+
+    public void submitToHybris(SupportTicketRequest req, String ticketId) {
+        try {
+            String url = ConceptBaseUrlResolver.buildReactUrl(
+                    req.getConcept(), req.getEnv(), "/feedback/submit");
+
+            MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+            form.add("platformType",  req.getPlatformType() != null ? req.getPlatformType() : "Online");
+            form.add("name",          safe(req.getName()));
+            form.add("email",         safe(req.getEmail()));
+            form.add("mobileNumber",  safe(req.getPhone()));
+            form.add("city",          safe(req.getCity()));
+            form.add("lmrNumber",     req.getRewards() != null ? req.getRewards() : "");
+            form.add("feedbackType",  safe(req.getCategory()));
+            form.add("message",       safe(req.getMessage()));
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(form, headers);
+
+            log.info("📤 [{}] Forwarding to Hybris feedback API: {}", ticketId, url);
+            log.info("📋 [{}] Payload: platformType={}, name={}, email={}, mobileNumber={}, city={}, feedbackType={}",
+                    ticketId,
+                    form.getFirst("platformType"),
+                    form.getFirst("name"),
+                    form.getFirst("email"),
+                    form.getFirst("mobileNumber"),
+                    form.getFirst("city"),
+                    form.getFirst("feedbackType"));
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url, HttpMethod.POST, entity, String.class);
+
+            log.info("✅ [{}] Hybris feedback response — status={}, body={}",
+                    ticketId, response.getStatusCode(), response.getBody());
+
+        } catch (Exception e) {
+            log.error("❌ [{}] Hybris feedback API call failed: {}", ticketId, e.getMessage(), e);
+        }
     }
 
     private String generateTicketId() {
