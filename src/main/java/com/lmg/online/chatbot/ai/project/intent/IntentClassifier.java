@@ -107,6 +107,12 @@ public class IntentClassifier {
           Rule: If the user is asking HOW something works or WHAT a policy is → POLICY_QUESTION.
           If the user is venting, demanding action, or explicitly wants a human/ticket → WRITE_US.
 
+        - CRM_COUPON_LIST: Customer wants to see their available coupons, discount codes, vouchers, or offers.
+          Use when the user asks about: "my coupons", "show my offers", "any discounts", "vouchers",
+          "promo codes", "my rewards", "available deals", "loyalty offers", "what coupons do I have".
+          Do NOT use for: general policy questions about how coupons work → use POLICY_QUESTION.
+          Do NOT use for: gift card balance → use GIFT_CARD_BALANCE.
+
         - GENERAL_QUERY: Greetings or completely unrelated questions.
           Examples: "hi", "hello", "what products do you sell", "do you have sale".
 

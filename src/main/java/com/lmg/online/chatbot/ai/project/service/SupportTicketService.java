@@ -7,6 +7,7 @@ import com.lmg.online.chatbot.ai.tools.support.entity.SupportTicket;
 import com.lmg.online.chatbot.ai.tools.support.repository.SupportTicketRepository;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +19,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
+
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 /**
  * Handles support ticket lifecycle:
@@ -67,6 +71,7 @@ public class SupportTicketService {
 
         try {
             ticketRepository.save(ticket);
+            main(req.getMessage(),req.getMessage()+req.getCategory(),new Date(),req.getEmail());
             log.info("💾 Support ticket {} saved to DB", ticketId);
         } catch (Exception dbEx) {
             // Don't abort — still try to send the email even if DB write fails
@@ -209,5 +214,61 @@ public class SupportTicketService {
 
     private String safe(String value) {
         return value != null ? value : "—";
+    }
+
+
+    public void main(String title, String ticketDetails, Date date,String email) {
+
+        String url = "https://devapi.kapturecrm.com/add-ticket-from-other-source.html/v.2.0";
+
+        RestTemplate restTemplate = new RestTemplate();
+
+        // 🔹 Headers
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", "Basic YOUR_TOKEN"); // replace token
+
+        // Optional cookies (usually not required unless API enforces it)
+        headers.set("Cookie", "JSESSIONID=; _KAPTURECRM_SESSION=");
+        Calendar cal = Calendar.getInstance();
+
+        // Add 5 days
+        cal.add(Calendar.DAY_OF_MONTH, 5);
+
+        Date updatedDate = cal.getTime();
+
+        // Format to String
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        String formattedDate = sdf.format(updatedDate);
+
+        // 🔹 Body (List of tickets)
+        List<Map<String, Object>> requestBody = new ArrayList<>();
+
+        Map<String, Object> ticket = new HashMap<>();
+        ticket.put("title", title);
+        ticket.put("ticket_details", formattedDate);
+        ticket.put("due_date",updatedDate.toString() );
+        ticket.put("email_id", "");
+
+        requestBody.add(ticket);
+
+        // 🔹 Request Entity
+        HttpEntity<List<Map<String, Object>>> request =
+                new HttpEntity<>(requestBody, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.POST,
+                    request,
+                    String.class
+            );
+
+            System.out.println("Status Code: " + response.getStatusCode());
+            System.out.println("Response: " + response.getBody());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

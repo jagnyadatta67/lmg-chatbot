@@ -1157,6 +1157,15 @@
         )
       },
 
+      /** Fetch the logged-in customer's available CRM coupons / offers (CRM_COUPON_LIST intent). */
+      getCoupons() {
+        return this._post(
+          "/chat",
+          { ...this._context(), message: "show my coupons", question: "show my coupons" },
+          "Fetching your coupons...",
+        )
+      },
+
       /**
        * Check the balance of a gift card.
        * Note: uses env "www" as required by the gift card service (not config.env).
@@ -1334,6 +1343,7 @@
       WALLET_BALANCE:     handleWalletBalanceResponse,
       STORE_LOCATOR:      handleStoreLocatorResponse,
       GIFT_CARD_BALANCE:  handleGiftCardBalanceResponse,
+      CRM_COUPON_LIST:    handleCrmCouponList,
       WRITE_US:           handleWriteUs,
       DEFAULT:            handleDefaultIntent,
     }
@@ -1986,19 +1996,19 @@
 
               let btns = ""
 
-              if (["PICKUP_SCHEDULED", "PICKUP_RESCHEDULED"].includes(rs)) {
+              if (["PICKUP_SCHEDULED", "PICKUP_RESCHEDULED","WAIT"].includes(rs)) {
                 btns =
                   btn("Delay in Return Pickup",       "Delay in return Pick up",                              "Return pickup is delayed.") +
                   btn("Wrong Product/Size",            "I have received Wrong Product/Wrong size",             "Wrong product or wrong size received.") +
                   btn("Related to Delivery executive", "Related to Delivery executive",                        "Issue related to delivery executive during return.")
 
-              } else if (["PICKUP_COMPLETE", "QC_FAILED", "SUBMITTED_TO_WAREHOUSER"].includes(rs)) {
+              } else if (["PICKUP_COMPLETE", "QC_FAILED", "SUBMITTED_TO_WAREHOUSE"].includes(rs)) {
                 btns =
                   btn("No Refund After Pickup",        "My Return was picked up but I haven't received my refund", "Return was picked up but refund not received.") +
                   btn("My Return was picked up but I haven't received my refund", "My Return was picked up but I haven't received my refund", "Return picked up but no refund yet.") +
                   btn("Where Is My Refund",             "Where is my refund",                                  "Refund not received after return pickup.")
 
-              } else if (["REFUND_INITIATED", "EFUND_INITIATED", "REFUND_PROCESSED"].includes(rs)) {
+              } else if (["REFUND_INITIATED", "REFUND_IN_PROGRESS", "REFUND_PROCESSED"].includes(rs)) {
                 btns =
                   btn("Where Is My Refund",             "Where is my refund",                                  "Refund initiated but not received yet.") +
                   btn("My Return was picked up but I haven't received my refund", "My Return was picked up but I haven't received my refund", "Return picked up, refund still pending.")
@@ -2236,7 +2246,7 @@
                 data-intent="ORDER_TRACKING_INLINE"
                 data-order-no="${orderNumber}">View Order</button>
               <button class="order-btn order-btn-secondary" onclick="copyToClipboard('${orderNumber}')">Copy Order #</button>
-              <a href="${orderUrl}" target="_blank" style="text-decoration:none;">
+              <a href="${orderUrl}" target="_self" style="text-decoration:none;">
                 <button class="order-btn order-btn-detail" style="font-size:0.78em;padding:5px 10px;">View Order Details ↗</button>
               </a>
             </div>
@@ -2419,8 +2429,9 @@
       ORDER_LISTING:    "view your order history",
       DELIVERY_TRACKING:"track your deliveries",
       RETURN_STATUS:    "check your return & refund status",
-      WALLET_BALANCE:   "view your wallet balance",
-      CUSTOMER_PROFILE: "access your account & profile",
+      WALLET_BALANCE:    "view your wallet balance",
+      CRM_COUPON_LIST:   "view your coupons & offers",
+      CUSTOMER_PROFILE:  "access your account & profile",
     }
 
     const SUBMENU_INTENT_HANDLERS = {
@@ -2436,6 +2447,7 @@
       DELIVERY_TRACKING:   async () => { await handleDeliveryTrackingMenu() },
       RETURN_STATUS:       async () => { await handleReturnStatusMenu() },
       WALLET_BALANCE:      async () => { await handleWalletBalanceMenu() },
+      CRM_COUPON_LIST:     async () => { await handleCrmCouponListMenu() },
       // My Profile — awaits pre-fetch then reads from session cache
       CUSTOMER_PROFILE:    async () => {
         if (profileCachePromise) await profileCachePromise
@@ -2719,7 +2731,7 @@
               <div class="order-entries-wrapper">${entriesHtml}</div>
               <div class="order-card-actions">
                 <button class="order-btn order-btn-secondary" style="font-size:11px;padding:5px 10px;min-height:30px;" onclick="copyToClipboard('${orderNo}')">Copy #</button>
-                <a href="${orderUrl}" target="_blank" style="text-decoration:none;">
+                <a href="${orderUrl}" target="_self" style="text-decoration:none;">
                   <button class="order-btn order-btn-detail" style="font-size:11px;padding:5px 10px;">View Order Details ↗</button>
                 </a>
               </div>
@@ -2897,6 +2909,77 @@
             </div>` : ""}
           </div>
         </div>`
+      chatBody.scrollTop = chatBody.scrollHeight
+      renderBackToMenu()
+      enableInput("Type your message...")
+    }
+
+    // CRM COUPON LIST  (submenu entry-point + INTENT_HANDLER response renderer)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Called when user taps "🎟️ My Coupons" submenu button. */
+    async function handleCrmCouponListMenu() {
+      const { data: json, error } = await api.getCoupons()
+      if (error || !json) {
+        renderBotMessage("⚠️ Unable to fetch your coupons right now. Please try again later.")
+        renderBackToMenu()
+        return
+      }
+      const payload = typeof json.data === "string" ? { chatMessage: json.data } : json.data || json
+      handleCrmCouponList(payload)
+    }
+
+    /**
+     * Renders the CrmCouponResponse returned by the CRM_COUPON_LIST intent.
+     * Expected shape: { couponList: [{ couponCode, couponDesc, validTillDate }], chatMessage }
+     */
+    function handleCrmCouponList(payload) {
+      if (checkAndTriggerLogin(payload, "Please sign in to view your coupons & offers.")) return
+
+      // Error / no-data case
+      if (payload.chatMessage && payload.chatMessage.trim() !== "") {
+        renderBotMessage(payload.chatMessage)
+        renderBackToMenu()
+        enableInput("Type your message...")
+        return
+      }
+
+      const coupons = payload.couponList || []
+
+      if (!coupons.length) {
+        renderBotMessage("🎟️ You don't have any active coupons at the moment. Check back soon for exciting offers!")
+        renderBackToMenu()
+        enableInput("Type your message...")
+        return
+      }
+
+      renderBotMessage(`<b>🎟️ Your Available Coupons (${coupons.length})</b>`)
+
+      coupons.forEach((c) => {
+        const desc      = (c.couponDesc || "").replace(/\s+/g, " ").trim()
+        const validTill = c.validTillDate
+          ? new Date(c.validTillDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+          : null
+
+        chatBody.innerHTML += `
+          <div class="order-card">
+            <div class="order-card-content">
+              <div class="order-card-header">
+                <div class="order-card-title" style="font-size:0.95rem;letter-spacing:1px;font-family:monospace;">
+                  🏷️ ${c.couponCode || "—"}
+                </div>
+              </div>
+              <div class="order-card-meta" style="color:#444;margin-top:4px;font-size:0.82rem;line-height:1.4;">
+                ${desc || "Special offer for you"}
+              </div>
+              ${validTill ? `
+              <div class="order-card-meta" style="color:#e53935;font-size:0.78rem;margin-top:6px;">
+                ⏳ Valid till: ${validTill}
+              </div>` : ""}
+            </div>
+          </div>`
+      })
+
       chatBody.scrollTop = chatBody.scrollHeight
       renderBackToMenu()
       enableInput("Type your message...")
